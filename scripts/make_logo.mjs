@@ -61,9 +61,9 @@ const BIG_HALF = 9.5;   // half stroke width for VEIL
 const ZK_HALF = 8.0;    // half stroke width for ZK
 const ACCENT = [45, 212, 191]; // teal accent for ZK (#2DD4BF)
 
-// gradient endpoints (diagonal, deep indigo -> royal blue)
-const c0 = [49, 46, 129];   // #312E81
-const c1 = [29, 78, 216];   // #1D4ED8
+// gradient endpoints (diagonal, deep emerald -> near-black charcoal)
+const c0 = [16, 67, 52];    // #104334 emerald
+const c1 = [8, 20, 17];     // #081411 near-black
 
 function minDist(px, py, polys) {
   let best = Infinity;
