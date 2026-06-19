@@ -24,3 +24,6 @@ bin/*.tar.gz
 # misc
 .DS_Store
 *.log
+
+# generated demo artifact (contains a throwaway auditor private key)
+build/onchain.json
