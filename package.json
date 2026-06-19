@@ -1,0 +1,20 @@
+{
+  "name": "veil",
+  "version": "0.1.0",
+  "description": "Veil — a Compliant Privacy Pool for USDC on Stellar. ZK (Circom/Groth16) proofs of deposit-membership + nullifier + approved-association-set, verified on-chain in a Soroban contract.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "compile": "node scripts/01_compile.mjs",
+    "setup": "node scripts/02_setup.mjs",
+    "prove": "node scripts/03_prove.mjs",
+    "verify": "node scripts/04_verify.mjs",
+    "demo": "node scripts/demo.mjs"
+  },
+  "dependencies": {
+    "circomlib": "^2.0.5",
+    "circomlibjs": "^0.1.7",
+    "snarkjs": "^0.7.4",
+    "ffjavascript": "^0.3.0"
+  }
+}

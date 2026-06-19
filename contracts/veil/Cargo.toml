@@ -1,0 +1,25 @@
+[package]
+name = "veil"
+version = "0.1.0"
+edition = "2021"
+description = "Veil — compliant privacy pool for USDC on Stellar (BN254 Groth16 verifier + pool)"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = "26"
+
+[dev-dependencies]
+soroban-sdk = { version = "26", features = ["testutils"] }
+
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+debug = 0
+strip = "symbols"
+lto = true
+panic = "abort"
+codegen-units = 1

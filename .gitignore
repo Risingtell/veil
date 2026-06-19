@@ -1,0 +1,24 @@
+# Node
+node_modules/
+
+# Circom/snarkjs build artifacts (large / regenerable)
+build/*.ptau
+build/*.zkey
+build/*.r1cs
+build/*.sym
+build/withdraw_js/
+build/*.wtns
+
+# keep: build/verification_key.json, build/proof.json, build/public.json,
+#       build/soroban_inputs.json  (small, useful to inspect)
+
+# Rust
+contracts/**/target/
+target/
+
+# the circom compiler binary is large; document how to fetch it instead
+bin/circom.exe
+
+# misc
+.DS_Store
+*.log
