@@ -16,18 +16,21 @@ Last updated: 2026-06-19. Hackathon deadline: **2026-06-29 20:00**.
   - `verify_proof` -> `true`, permanent tx:
     `85e0003da72fc087160a097ebd2178e9a2bb1b0f660fa241ba28d1f54a49f2ca`
   - Init tx: `c627e5ca9ceb451b72d9197d695008fa98dd9ce627ce0b24e1556edaeb6550b7`
+- **FULL deposit→withdraw demo LIVE on testnet** (native XLM SAC):
+  - Demo contract: `CBJZLA6NRAOY5TL3WBBB6RF7X65RUNBRRTTBLJK2SYR67SGHTS3UGZB4`
+  - Native SAC token: `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC`, denom 1 XLM
+  - 5 real deposits → publish_root + set_association_root → withdraw paid
+    **1 XLM privately to a fresh recipient** `GDK3XQFVN5ECZQSJIKLSJ7B3W4QGB2Q2PVBCKRLZQHPIC4G6J6CI2EBB`
+  - Withdraw tx: `d6e6c9652ad8e39ff30ed405b15ed7338e20dc452bdf3194b75b611ada79f0ea`
+  - Pool 5→4 XLM, recipient +1 XLM; **replay rejected on-chain (Error #4 NullifierAlreadyUsed)**.
+  - Reproducible: `RECIPIENT=<G..> node scripts/onchain_demo.mjs && node scripts/05_export.mjs && node scripts/deploy/cli_args.mjs && bash scripts/deploy/testnet_demo.sh`
 - Registered as Hacker on DoraHacks (not yet submitted).
 
 ## ⏭️ TODO (next session)
-1. **Full deposit→withdraw demo on testnet** with native XLM SAC (show a real
-   private payout to a fresh address). Was mid-setup: planned to export the tree
-   commitments from `demo.mjs` to `build/onchain.json`, deploy a fresh contract
-   inited with the native SAC token, deposit, publish_root, set_association_root,
-   withdraw to a fresh recipient, check balances.
-2. **Auditor view-key / selective-disclosure** differentiator (uniqueness wedge).
-3. **Push to GitHub** (needs the user's account) — repo is committed locally.
-4. **Record 2–3 min demo video** (submission requirement).
-5. **Submit BUIDL** on DoraHacks before the deadline.
+1. **Auditor view-key / selective-disclosure** differentiator (uniqueness wedge).
+2. **Push to GitHub** (needs the user's account) — repo is committed locally.
+3. **Record 2–3 min demo video** (submission requirement).
+4. **Submit BUIDL** on DoraHacks before the deadline.
 
 ## 🔧 Environment / how to resume
 Tools are NOT on the global PATH. Prepend them:
