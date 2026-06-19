@@ -16,8 +16,10 @@ build/*.wtns
 contracts/**/target/
 target/
 
-# the circom compiler binary is large; document how to fetch it instead
+# large local tool binaries; documented in README how to fetch them
 bin/circom.exe
+bin/stellar.exe
+bin/*.tar.gz
 
 # misc
 .DS_Store
