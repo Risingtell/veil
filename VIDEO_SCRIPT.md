@@ -4,6 +4,17 @@
 ZK verification, (2) a private payout, (3) an auditor who can de-anonymize it.
 Total target: **~2:45**. Spoken parts are written to be read at a normal pace.
 
+## ⭐ Easiest path: one command, fully live (~8 seconds)
+
+Run **`bash scripts/show.sh`** on camera. It hits the real testnet contract and
+walks through all four beats — on-chain proof verification, the settled private
+payout, the double-spend rejection, and the auditor trace — in about 8 seconds.
+Narrate over it using the section headings below. This is the recommended take;
+the shot-by-shot version after it is optional if you want to show the source
+files and explorer too.
+
+---
+
 **Before you hit record — open these:**
 - Terminal A (in `C:\Users\HP\veil`, PATH already set) — for running the demos.
 - Browser tab 1: the withdraw tx on stellar.expert
