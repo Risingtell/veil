@@ -27,3 +27,6 @@ bin/*.tar.gz
 
 # generated demo artifact (contains a throwaway auditor private key)
 build/onchain.json
+
+# vercel project link metadata
+landing/.vercel/
