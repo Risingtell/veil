@@ -8,11 +8,19 @@
 **Track:** Open innovation — leaning into the 🟠 *"compliant privacy pool with ASP integration"* idea SDF flags as the real-world sweet spot.
 
 ### ✅ Live on Stellar testnet
-- **Contract:** `CDYIWITNVAI5CJ5BUU2WI7KNSBPPG7BHM4EBY2JSAEHJG4KMUEEPP3YX`
-- **On-chain proof verification tx** (`verify_proof` → `true`):
+- **Verifier contract:** `CDYIWITNVAI5CJ5BUU2WI7KNSBPPG7BHM4EBY2JSAEHJG4KMUEEPP3YX`
+  — on-chain `verify_proof` → `true`:
   [85e0003d…](https://stellar.expert/explorer/testnet/tx/85e0003da72fc087160a097ebd2178e9a2bb1b0f660fa241ba28d1f54a49f2ca)
+- **Full pool demo contract:** `CDP4K4VRHXAT5X7T3M6RSRPP57XPRAVRLPV2KDFA7YBMNPJRTPWNIXQ4`
+  — real deposit→withdraw of native XLM: 5 deposits, then a ZK withdrawal paid
+  **1 XLM privately** to a fresh address
+  ([withdraw tx 1940d42b…](https://stellar.expert/explorer/testnet/tx/1940d42bdf872828a1f1ec4ecd2fce08ff9b923e35ddb0b1802892dc7a8cc33a)),
+  with on-chain double-spend rejection.
 - A **real** Circom/snarkjs Groth16 proof, verified by Stellar's Protocol 26
   **BN254 `pairing_check`** host function, inside the deployed contract.
+- **Auditor view-key**: every deposit publishes an on-chain encrypted record that
+  only a designated regulator can open — privacy for the public, full
+  auditability for the regulator (`node scripts/audit_demo.mjs`).
 
 ---
 
@@ -38,7 +46,8 @@ does not exist.
 Veil is shown as **confidential payroll / aid disbursement**: an employer or NGO
 funds the pool; recipients withdraw their stipend privately to a fresh wallet;
 individual payouts are unlinkable on-chain, yet every recipient is provably from
-a screened, approved set, and an auditor can be given the commitment list.
+a screened, approved set, and a designated auditor can de-anonymize any payout
+on demand via the on-chain view-key records (see *Auditor view-key* below).
 
 ---
 
@@ -64,6 +73,28 @@ Public inputs (in order): `[root, associationRoot, nullifierHash, recipient, fee
 
 ---
 
+## Auditor view-key — privacy *and* auditability
+
+A naive privacy pool is opaque even to a legitimate regulator. Veil adds a
+**selective-disclosure** layer: a designated auditor holds a **BabyJubJub**
+keypair, and at deposit time the depositor encrypts an audit record —
+`(identity, nullifier)` — to the auditor's public key and **publishes the
+ciphertext on-chain**. So the regulator's ability to investigate never depends
+on a depositor voluntarily keeping records.
+
+- **The public** sees only ciphertext; withdrawals stay unlinkable.
+- **The auditor**, with the view-key, decrypts any record and — by hashing the
+  recovered nullifier to the same `nullifierHash` the withdrawal reveals — traces
+  an anonymous payout back to a real identity.
+
+The scheme is ElGamal-style hybrid encryption with a Poseidon stream cipher over
+BabyJubJub (the embedded curve of BN254), so every value lives in the same field
+as the circuit signals — which means the correctness of an audit record can be
+enforced *inside the circuit* as a natural next step. See `scripts/lib/audit.mjs`
+and run the live demo with `node scripts/audit_demo.mjs`.
+
+---
+
 ## How Stellar verifies it (the load-bearing part)
 
 `contracts/veil` is a Soroban contract that verifies the proof on-chain with the
@@ -81,9 +112,10 @@ this hackathon was created to exercise, and it's Ethereum-precompile-compatible.
 
 The contract also implements the pool:
 `init` · `deposit` · `publish_root` · `set_association_root` · `withdraw` ·
-`verify_proof`. `withdraw` checks the deposit root is known, the association
-root matches the ASP, the nullifier is unused, **verifies the proof**, then pays
-out USDC.
+`verify_proof` · `auditor` · `audit_records` · `commitments`. `withdraw` checks
+the deposit root is known, the association root matches the ASP, the nullifier is
+unused, **verifies the proof**, then pays out. `deposit` additionally stores the
+encrypted auditor record on-chain.
 
 ---
 
@@ -101,8 +133,12 @@ scripts/
   01_compile.mjs       # circom -> r1cs + wasm
   02_setup.mjs         # Powers of Tau + Groth16 trusted setup
   demo.mjs             # full off-chain story (deposit -> private withdraw)
+  onchain_demo.mjs     # prepare a real testnet deposit->withdraw (+ audit records)
+  audit_demo.mjs       # auditor opens on-chain records, traces a withdrawal
   05_export.mjs        # snarkjs JSON -> Soroban byte layout (EIP-197) + fixture
   lib/veil.mjs         # Poseidon + Merkle helpers (match the circuit exactly)
+  lib/audit.mjs        # auditor view-key (Poseidon-ElGamal over BabyJubJub)
+  deploy/testnet_demo.sh   # one-shot live testnet deposit->withdraw demo
 bin/circom.exe         # circom 2.1.9 compiler
 ```
 
@@ -117,6 +153,12 @@ node scripts/05_export.mjs   # produce Soroban inputs + Rust test fixture
 
 # on-chain verification (real Groth16 proof, real BN254 host functions):
 cd contracts/veil && cargo test
+
+# full live testnet demo: deposit -> private withdraw of native XLM
+RECIPIENT=<G...address> node scripts/onchain_demo.mjs
+node scripts/05_export.mjs && node scripts/deploy/cli_args.mjs
+bash scripts/deploy/testnet_demo.sh
+node scripts/audit_demo.mjs   # regulator traces the anonymous withdrawal
 ```
 
 ---
@@ -131,6 +173,14 @@ cd contracts/veil && cargo test
   `CDYIWITNVAI5CJ5BUU2WI7KNSBPPG7BHM4EBY2JSAEHJG4KMUEEPP3YX`, verify tx
   `85e0003da72fc087160a097ebd2178e9a2bb1b0f660fa241ba28d1f54a49f2ca`. Also
   reproducible offline via `cargo test` (host environment) — see `DEPLOY.md`.
+- **Full deposit→withdraw of native XLM: LIVE on testnet.** Contract
+  `CDP4K4VRHXAT5X7T3M6RSRPP57XPRAVRLPV2KDFA7YBMNPJRTPWNIXQ4` — 5 deposits, then a
+  ZK withdrawal paid 1 XLM to a fresh address (withdraw tx
+  `1940d42bdf872828a1f1ec4ecd2fce08ff9b923e35ddb0b1802892dc7a8cc33a`); a replay
+  is rejected on-chain (`NullifierAlreadyUsed`).
+- **Auditor view-key: working.** Encrypted `(identity, nullifier)` records are
+  stored on-chain at deposit; `scripts/audit_demo.mjs` opens them with the
+  view-key and traces the anonymous withdrawal to a real identity.
 - **Simplifications (called out honestly):**
   - Fixed-denomination notes (variable amounts = future work via range proofs).
   - The deposit Merkle tree is maintained off-chain and its root is posted by

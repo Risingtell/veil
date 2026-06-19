@@ -71,7 +71,8 @@ fn verifies_real_proof() {
 
     let admin = Address::generate(&env);
     let token = Address::generate(&env);
-    client.init(&admin, &token, &100_0000000i128, &vk(&env));
+    let auditor = BytesN::from_array(&env, &[7u8; 32]);
+    client.init(&admin, &token, &100_0000000i128, &auditor, &vk(&env));
 
     // The real proof must verify against the host BN254 pairing check.
     let ok = client.verify_proof(&proof(&env), &public_inputs(&env));
@@ -86,7 +87,8 @@ fn rejects_tampered_public_input() {
 
     let admin = Address::generate(&env);
     let token = Address::generate(&env);
-    client.init(&admin, &token, &100_0000000i128, &vk(&env));
+    let auditor = BytesN::from_array(&env, &[7u8; 32]);
+    client.init(&admin, &token, &100_0000000i128, &auditor, &vk(&env));
 
     // Flip the nullifierHash public input -> proof must now FAIL.
     let mut pubs = public_inputs(&env);

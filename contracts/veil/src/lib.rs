@@ -63,9 +63,11 @@ pub enum DataKey {
     Token,
     Denom,
     Vk,
+    Auditor,               // BytesN<32>: packed BabyJubJub public key of the regulator
     AssocRoot,
     Roots,                 // Vec<BytesN<32>>: registered deposit-tree roots
     Commitments,           // Vec<BytesN<32>>: every deposited commitment (auditability)
+    Audits,                // Vec<Bytes>: encrypted audit record per deposit (parallel to Commitments)
     Nullifier(BytesN<32>), // spent markers
 }
 
@@ -75,22 +77,37 @@ pub struct Veil;
 #[contractimpl]
 impl Veil {
     /// One-time initialization. `denom` is the fixed note size (in token
-    /// stroops). `vk` is the Groth16 verification key for withdraw.circom.
-    pub fn init(env: Env, admin: Address, token: Address, denom: i128, vk: VkBytes) {
+    /// stroops). `auditor` is the packed BabyJubJub public key of the regulator
+    /// permitted to open audit records. `vk` is the Groth16 verification key.
+    pub fn init(
+        env: Env,
+        admin: Address,
+        token: Address,
+        denom: i128,
+        auditor: BytesN<32>,
+        vk: VkBytes,
+    ) {
         if env.storage().instance().has(&DataKey::Admin) {
             panic_with(&env, Error::AlreadyInitialized);
         }
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::Token, &token);
         env.storage().instance().set(&DataKey::Denom, &denom);
+        env.storage().instance().set(&DataKey::Auditor, &auditor);
         env.storage().instance().set(&DataKey::Vk, &vk);
         env.storage().persistent().set(&DataKey::Roots, &Vec::<BytesN<32>>::new(&env));
         env.storage().persistent().set(&DataKey::Commitments, &Vec::<BytesN<32>>::new(&env));
+        env.storage().persistent().set(&DataKey::Audits, &Vec::<Bytes>::new(&env));
     }
 
     /// Deposit `denom` of the pool token against `commitment`
     /// (= Poseidon(nullifier, secret), computed client-side).
-    pub fn deposit(env: Env, from: Address, commitment: BytesN<32>) {
+    ///
+    /// `audit` is an encrypted audit record (Poseidon-ElGamal over BabyJubJub)
+    /// that only the auditor's view-key can open. It is published on-chain so
+    /// the regulator's ability to de-anonymize never depends on the depositor
+    /// retaining off-chain data — privacy to the public, auditability by design.
+    pub fn deposit(env: Env, from: Address, commitment: BytesN<32>, audit: Bytes) {
         from.require_auth();
         let denom: i128 = get(&env, &DataKey::Denom);
         let token_addr: Address = get(&env, &DataKey::Token);
@@ -103,6 +120,10 @@ impl Veil {
             env.storage().persistent().get(&DataKey::Commitments).unwrap();
         commits.push_back(commitment.clone());
         env.storage().persistent().set(&DataKey::Commitments, &commits);
+        let mut audits: Vec<Bytes> =
+            env.storage().persistent().get(&DataKey::Audits).unwrap();
+        audits.push_back(audit);
+        env.storage().persistent().set(&DataKey::Audits, &audits);
         env.events().publish((soroban_sdk::symbol_short!("deposit"),), commitment);
     }
 
@@ -185,6 +206,22 @@ impl Veil {
     pub fn verify_proof(env: Env, proof: ProofBytes, public_inputs: Vec<BytesN<32>>) -> bool {
         let vk: VkBytes = get(&env, &DataKey::Vk);
         groth16_verify(&env, &vk, &proof, &public_inputs)
+    }
+
+    /// The regulator's view-key (packed BabyJubJub public key) declared at init.
+    pub fn auditor(env: Env) -> BytesN<32> {
+        get(&env, &DataKey::Auditor)
+    }
+
+    /// All on-chain encrypted audit records, in deposit order (parallel to the
+    /// commitments). Public, but only openable with the auditor's private key.
+    pub fn audit_records(env: Env) -> Vec<Bytes> {
+        env.storage().persistent().get(&DataKey::Audits).unwrap()
+    }
+
+    /// Every deposited commitment, in order (for auditor enumeration).
+    pub fn commitments(env: Env) -> Vec<BytesN<32>> {
+        env.storage().persistent().get(&DataKey::Commitments).unwrap()
     }
 }
 

@@ -24,13 +24,20 @@ Last updated: 2026-06-19. Hackathon deadline: **2026-06-29 20:00**.
   - Withdraw tx: `d6e6c9652ad8e39ff30ed405b15ed7338e20dc452bdf3194b75b611ada79f0ea`
   - Pool 5→4 XLM, recipient +1 XLM; **replay rejected on-chain (Error #4 NullifierAlreadyUsed)**.
   - Reproducible: `RECIPIENT=<G..> node scripts/onchain_demo.mjs && node scripts/05_export.mjs && node scripts/deploy/cli_args.mjs && bash scripts/deploy/testnet_demo.sh`
+- **Auditor view-key / selective disclosure — DONE & live.** Poseidon-ElGamal
+  over BabyJubJub (`scripts/lib/audit.mjs`). Each deposit publishes an encrypted
+  `(identity, nullifier)` record on-chain (contract `init` stores auditor pubkey;
+  `deposit` stores the record; getters `auditor`/`audit_records`/`commitments`).
+  Demo contract `CDP4K4VRHXAT5X7T3M6RSRPP57XPRAVRLPV2KDFA7YBMNPJRTPWNIXQ4`,
+  withdraw tx `1940d42bdf872828a1f1ec4ecd2fce08ff9b923e35ddb0b1802892dc7a8cc33a`.
+  `node scripts/audit_demo.mjs` reads records live from chain, decrypts with the
+  view-key, and traces the anonymous withdrawal back to "Fatima Sani #003".
 - Registered as Hacker on DoraHacks (not yet submitted).
 
 ## ⏭️ TODO (next session)
-1. **Auditor view-key / selective-disclosure** differentiator (uniqueness wedge).
-2. **Push to GitHub** (needs the user's account) — repo is committed locally.
-3. **Record 2–3 min demo video** (submission requirement).
-4. **Submit BUIDL** on DoraHacks before the deadline.
+1. **Push to GitHub** (needs the user's account) — repo is committed locally.
+2. **Record 2–3 min demo video** (submission requirement).
+3. **Submit BUIDL** on DoraHacks before the deadline.
 
 ## 🔧 Environment / how to resume
 Tools are NOT on the global PATH. Prepend them:

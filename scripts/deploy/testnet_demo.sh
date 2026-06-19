@@ -22,6 +22,7 @@ RECIP_ADDR=$(stellar keys address $RECIP_ID)
 DENOM=$(node -e 'console.log(require("./build/onchain.json").denom_stroops)')
 DROOT=$(node -e 'console.log(require("./build/onchain.json").deposits_root)')
 AROOT=$(node -e 'console.log(require("./build/onchain.json").association_root)')
+AUDITOR=$(node -e 'console.log(require("./build/onchain.json").auditor_pub_packed)')
 
 say() { echo; echo "=== $* ==="; }
 
@@ -30,18 +31,19 @@ CID=$(stellar contract deploy --wasm "$WASM" --source $ADMIN --network $NET 2>/d
 echo "  CID=$CID"
 echo "$CID" > build/contract_id.txt
 
-say "2. init (token = native XLM SAC, denom = $DENOM stroops)"
+say "2. init (token = native XLM SAC, denom = $DENOM stroops, auditor view-key set)"
 stellar contract invoke --id "$CID" --source $ADMIN --network $NET -- \
   init --admin "$ADMIN_ADDR" --token "$SAC" --denom "$DENOM" \
-       --vk "$(cat build/cli/vk.json)" >/dev/null
-echo "  ✓ initialized"
+       --auditor "$AUDITOR" --vk "$(cat build/cli/vk.json)" >/dev/null
+echo "  ✓ initialized; auditor pubkey $AUDITOR"
 
-say "3. Deposit all 5 commitments (real XLM moves into the pool)"
+say "3. Deposit all 5 commitments + on-chain encrypted audit records"
 N=$(node -e 'console.log(require("./build/onchain.json").commitments.length)')
 for i in $(seq 0 $((N-1))); do
   C=$(node -e "console.log(require('./build/onchain.json').commitments[$i])")
+  AU=$(node -e "console.log(require('./build/onchain.json').audits[$i])")
   stellar contract invoke --id "$CID" --source $ADMIN --network $NET -- \
-    deposit --from "$ADMIN_ADDR" --commitment "$C" >/dev/null
+    deposit --from "$ADMIN_ADDR" --commitment "$C" --audit "$AU" >/dev/null
   echo "  ✓ deposit #$i  ($C)"
 done
 
