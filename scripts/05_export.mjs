@@ -8,7 +8,7 @@
 //        first); the Ethereum/Soroban precompile wants the imaginary part
 //        first. Getting this wrong is the #1 reason on-chain Groth16 fails.
 //   Fr  = 32-byte big-endian scalar.
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -40,6 +40,18 @@ const proof = JSON.parse(readFileSync("build/proof.json"));
 const pub = JSON.parse(readFileSync("build/public.json"));
 const vk = JSON.parse(readFileSync("build/verification_key.json"));
 
+// The Rust fixture pins the contract's tests to a specific proof AND the
+// deposits behind it, so both have to come from the same run. onchain_demo.mjs
+// also writes build/proof.json but describes a different pool, so only refresh
+// the fixture when the scenario on disk is the one this proof was built
+// against. Otherwise the tests would deposit one set of commitments and try to
+// verify a proof about another.
+let scenario = null;
+if (existsSync("build/scenario.json")) {
+  const s = JSON.parse(readFileSync("build/scenario.json"));
+  if (BigInt(s.depositsRoot) === BigInt(pub[0])) scenario = s;
+}
+
 const out = {
   curve: "bn254",
   // proof
@@ -58,12 +70,21 @@ const out = {
     ic: vk.IC.map(g1),
   },
   // public signals as 32-byte scalars, in circuit order:
-  // [root, associationRoot, nullifierHash, recipient, fee]
+  // [root, associationRoot, nullifierHash,
+  //  recipientHi, recipientLo, relayerHi, relayerLo, fee]
   publicSignals: pub.map(hex32),
 };
 
 writeFileSync("build/soroban_inputs.json", JSON.stringify(out, null, 2));
 console.log("✓ Wrote build/soroban_inputs.json");
+
+if (!scenario) {
+  console.log(
+    "• skipped contracts/veil/src/fixture.rs, build/scenario.json does not\n" +
+      "  describe this proof (run `npm run prove` to refresh both together)."
+  );
+  process.exit(0);
+}
 
 // Also emit a Rust fixture so the contract's test can verify this exact proof
 // in the real Soroban host environment.
@@ -85,6 +106,17 @@ ${icLines}
 pub const PUBLIC: [&str; ${out.publicSignals.length}] = [
 ${pubLines}
 ];
+
+// The scenario this proof was generated against. Depositing COMMITMENTS in
+// order reproduces, on-chain, the exact deposits root the proof names.
+pub const COMMITMENTS: [&str; ${scenario.commitments.length}] = [
+${scenario.commitments.map((c) => `    "${hex32(c)}",`).join("\n")}
+];
+pub const ASSOCIATION_ROOT: &str = "${hex32(scenario.associationRoot)}";
+pub const DEPOSITS_ROOT: &str = "${hex32(scenario.depositsRoot)}";
+pub const RECIPIENT: &str = "${scenario.recipient}";
+pub const RELAYER: &str = "${scenario.relayer}";
+pub const FEE: i128 = ${scenario.fee};
 `;
 writeFileSync("contracts/veil/src/fixture.rs", rust);
 console.log("✓ Wrote contracts/veil/src/fixture.rs (Rust test fixture)");

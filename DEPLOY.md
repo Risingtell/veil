@@ -14,7 +14,7 @@ cd contracts/veil
 cargo test            # runs verifies_real_proof + rejects_tampered_public_input
 ```
 A green `verifies_real_proof` means the exact snarkjs proof in
-`src/fixture.rs` is accepted by the **BN254 pairing host function** — this is
+`src/fixture.rs` is accepted by the **BN254 pairing host function** this is
 genuine on-chain-equivalent ZK verification.
 
 ## 2. Build the contract to WASM

@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Veil ZK — Compliant Privacy Pool on Stellar</title>
+<title>Veil ZK. Compliant Privacy Pool on Stellar</title>
 <meta name="description" content="Veil is a privacy pool on Stellar where every withdrawal proves, in zero-knowledge, that funds came from a compliance-approved set. Private for the public, auditable for regulators." />
 <link rel="icon" type="image/png" href="veil-logo.png" />
-<meta property="og:title" content="Veil ZK — Compliant Privacy Pool on Stellar" />
+<meta property="og:title" content="Veil ZK. Compliant Privacy Pool on Stellar" />
 <meta property="og:description" content="Private payouts that carry their own proof of compliance. Live on Stellar testnet with Protocol 26 BN254." />
 <meta property="og:image" content="veil-logo.png" />
 <style>
@@ -112,9 +112,10 @@
 <header><div class="wrap">
   <span class="pill"><span class="dot"></span> Stellar Hacks: Real-World ZK</span>
   <h1>Private payouts that prove<br/>their own <span class="grad">compliance</span></h1>
-  <p class="sub">Veil is a privacy pool on Stellar where every withdrawal proves, in zero-knowledge, that the funds came from a real deposit inside a compliance-approved set — privacy for honest users, exclusion of bad actors, in a single proof.</p>
+  <p class="sub">Veil is a privacy pool on Stellar where every withdrawal proves, in zero-knowledge, that the funds came from a real deposit inside a compliance-approved set, privacy for honest users, exclusion of bad actors, in a single proof.</p>
   <div class="cta">
-    <a class="btn btn-primary" href="https://youtu.be/onMNhJ-HTuE" target="_blank">▶ Watch the demo</a>
+    <a class="btn btn-primary" href="console.html">Verify it yourself</a>
+    <a class="btn btn-ghost" href="https://youtu.be/onMNhJ-HTuE" target="_blank">Watch the demo</a>
     <a class="btn btn-ghost" href="https://github.com/Risingtell/veil" target="_blank">View on GitHub</a>
   </div>
 </div></header>
@@ -122,7 +123,7 @@
 <section id="problem"><div class="wrap">
   <div class="eyebrow">The problem</div>
   <h2>Privacy without compliance is a dead end</h2>
-  <p class="lead">A plain mixer is indistinguishable from money laundering, so banks, payroll providers and aid organizations can't touch it. Veil fixes the trade-off the way the Privacy Pools paper proposes — provable compliance baked into every private withdrawal.</p>
+  <p class="lead">A plain mixer is indistinguishable from money laundering, so banks, payroll providers and aid organizations can't touch it. Veil fixes the trade-off the way the Privacy Pools paper proposes, provable compliance baked into every private withdrawal.</p>
   <div class="split">
     <div class="panel bad"><h3>Plain mixers</h3><ul>
       <li>Anyone can hide, including bad actors</li>
@@ -132,7 +133,7 @@
     </ul></div>
     <div class="panel good"><h3>Veil</h3><ul>
       <li>Withdrawals prove membership in an approved set</li>
-      <li>Zero-knowledge — no amounts or links revealed</li>
+      <li>Zero-knowledge, no amounts or links revealed</li>
       <li>A regulator view-key for full auditability</li>
       <li>Built for payroll &amp; aid disbursement</li>
     </ul></div>
@@ -144,7 +145,7 @@
   <h2>Zero-knowledge that is load-bearing</h2>
   <p class="lead">The Soroban contract releases nothing unless a real Groth16 proof verifies on-chain via Stellar's new Protocol 26 <span class="mono">BN254 pairing_check</span> host function. Remove the ZK and the product doesn't exist.</p>
   <div class="grid">
-    <div class="card"><div class="ic">🔒</div><h3>Verified on-chain</h3><p>A single Circom circuit proves note ownership, deposit-tree membership, approved-set membership, and an unspent nullifier — checked by the contract itself, not a server.</p></div>
+    <div class="card"><div class="ic">🔒</div><h3>Verified on-chain</h3><p>A single Circom circuit proves note ownership, deposit-tree membership, approved-set membership, and an unspent nullifier, checked by the contract itself, not a server.</p></div>
     <div class="card"><div class="ic">💸</div><h3>Private payout</h3><p>Deposit a fixed denomination; later withdraw to a fresh, unlinkable address by submitting a proof. Live on testnet: a real 1 XLM private payout with on-chain double-spend protection.</p></div>
     <div class="card"><div class="ic">🛡️</div><h3>Compliance gate</h3><p>Every withdrawal must also prove the note is in an Association Set Provider's approved set. Honest users stay private; flagged deposits are provably un-withdrawable.</p></div>
   </div>
@@ -152,21 +153,21 @@
 
 <section id="auditor"><div class="wrap">
   <div class="eyebrow">The differentiator</div>
-  <h2>Auditor view-key — private <span class="grad">and</span> auditable</h2>
+  <h2>Auditor view-key, private <span class="grad">and</span> auditable</h2>
   <p class="lead">A designated regulator holds a BabyJubJub view-key. At deposit time, an encrypted record is published <strong>on-chain</strong>, so the regulator's ability to investigate never depends on a depositor keeping data.</p>
   <div class="split">
     <div class="panel"><h3>🌐 The public sees</h3>
-      <p style="color:var(--muted);font-size:15px">Only ciphertext. Withdrawals are unlinkable — nobody can connect a payout to a deposit or a person.</p>
+      <p style="color:var(--muted);font-size:15px">Only ciphertext. Withdrawals are unlinkable, nobody can connect a payout to a deposit or a person.</p>
     </div>
     <div class="panel good"><h3>🔑 The auditor sees</h3>
-      <p style="color:var(--ink2);font-size:15px">Decrypts any record with the view-key, then hashes the nullifier to trace an anonymous withdrawal back to a real identity — on demand.</p>
+      <p style="color:var(--ink2);font-size:15px">Decrypts any record with the view-key, then hashes the nullifier to trace an anonymous withdrawal back to a real identity, on demand.</p>
     </div>
   </div>
 </div></section>
 
 <section id="live" class="live"><div class="wrap">
   <div class="eyebrow">Live on Stellar testnet</div>
-  <h2>Not a mockup — the real thing on-chain</h2>
+  <h2>Not a mockup, the real thing on-chain</h2>
   <p class="lead">Every claim here is reproducible against the deployed contract. One command (<span class="mono">bash scripts/show.sh</span>) walks through it all in ~8 seconds.</p>
   <div class="facts">
     <div class="fact"><div class="k">Network</div><div class="v">Stellar Testnet · Protocol 26 BN254</div></div>
@@ -181,7 +182,7 @@
 
 <footer><div class="wrap">
   <div class="brand"><img src="veil-logo.png" alt="Veil" style="width:30px;height:30px;border-radius:8px"/> VEIL<span style="color:var(--mint)">ZK</span></div>
-  <p>Built from scratch on BN254 — Circom + snarkjs + Soroban. Research prototype; not audited.</p>
+  <p>Built from scratch on BN254. Circom + snarkjs + Soroban. Research prototype; not audited.</p>
   <p style="margin-top:8px"><a class="accent" href="https://github.com/Risingtell/veil" target="_blank">github.com/Risingtell/veil</a></p>
 </div></footer>
 

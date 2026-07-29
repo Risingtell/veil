@@ -1,8 +1,8 @@
-// Veil — auditor selective-disclosure demo.
+// Veil, auditor selective-disclosure demo.
 //
 // Reads the LIVE on-chain encrypted audit records from the deployed contract,
 // then shows two views of the very same data:
-//   • the PUBLIC sees only ciphertext — withdrawals are unlinkable;
+//   • the PUBLIC sees only ciphertext, withdrawals are unlinkable;
 //   • the AUDITOR, with the view-key, decrypts each record, recovers the
 //     depositor identity + nullifier, and traces the anonymous on-chain
 //     withdrawal back to a real person.
@@ -38,17 +38,17 @@ async function main() {
   const records = chainCall("audit_records");
   console.log(`  ${records.length} encrypted audit records stored on-chain`);
 
-  banner("1. The PUBLIC view — ciphertext only, nothing linkable");
+  banner("1. The PUBLIC view, ciphertext only, nothing linkable");
   console.log("  audit_records[0] =", records[0].slice(0, 48) + "…");
   console.log("  (a withdrawal reveals only a nullifier hash; which deposit it");
   console.log("   came from, and who deposited it, is cryptographically hidden)");
 
-  banner("2. The AUDITOR view — open every record with the view-key");
+  banner("2. The AUDITOR view, open every record with the view-key");
   const byNullifierHash = {};
   records.forEach((hex, i) => {
     const [idField, nullifier] = audit.decrypt(BigInt(oc.auditor_priv), hex, 2);
     const idHex = (idField % (1n << 256n)).toString(16).padStart(64, "0");
-    const identity = oc.identity_registry[idHex] || "(unknown — not in KYC registry)";
+    const identity = oc.identity_registry[idHex] || "(unknown, not in KYC registry)";
     const nh = (audit.nullifierHash(nullifier) % (1n << 256n))
       .toString(16)
       .padStart(64, "0");
@@ -61,7 +61,7 @@ async function main() {
   console.log("  on-chain withdrawal nullifierHash =", spent.slice(0, 24) + "…");
   const who = byNullifierHash[spent];
   console.log(`  recipient ${oc.recipient.slice(0, 10)}… was paid by:  >>> ${who} <<<`);
-  console.log("\n  Privacy for the public, full auditability for the regulator —");
+  console.log("\n  Privacy for the public, full auditability for the regulator, ");
   console.log("  the same property SDF's real-world ZK track is asking for.");
 }
 

@@ -1,4 +1,4 @@
-// Veil — prepare a FULL on-chain deposit→withdraw demo on testnet.
+// Veil: prepare a FULL on-chain deposit→withdraw demo on testnet.
 //
 // Unlike demo.mjs (which only proves + verifies off-chain), this script binds
 // the withdrawal to a REAL Stellar recipient address and emits every artifact
@@ -7,7 +7,7 @@
 //   - build/onchain.json                      (commitments, roots, recipient)
 //
 // The recipient G-address is passed in via RECIPIENT env var, because it is a
-// PUBLIC INPUT bound into the proof — the payout is cryptographically tied to
+// PUBLIC INPUT bound into the proof. The payout is cryptographically tied to
 // exactly that address.
 import * as snarkjs from "snarkjs";
 import { writeFileSync } from "node:fs";
@@ -21,7 +21,7 @@ import {
   makeHasher,
   makeNote,
   MerkleTree,
-  addressToField,
+  labelToField,
   buildWithdrawInput,
 } from "./lib/veil.mjs";
 import { buildAudit } from "./lib/audit.mjs";
@@ -29,11 +29,11 @@ import { buildAudit } from "./lib/audit.mjs";
 // Human-readable identities the regulator's KYC registry maps to. Each deposit
 // carries an encrypted record of (identity, nullifier) for the auditor.
 const IDENTITIES = [
-  "Aisha Bello — Payroll #001",
-  "Chidi Okafor — Payroll #002",
-  "Fatima Sani — Payroll #003",
-  "Emeka Eze — Payroll #004",
-  "FLAGGED ACCOUNT — Payroll #005",
+  "Aisha Bello (Payroll #001)",
+  "Chidi Okafor (Payroll #002)",
+  "Fatima Sani (Payroll #003)",
+  "Emeka Eze (Payroll #004)",
+  "FLAGGED ACCOUNT (Payroll #005)",
 ];
 
 const WASM = "build/withdraw_js/withdraw.wasm";
@@ -41,6 +41,10 @@ const ZKEY = "build/withdraw_final.zkey";
 
 const RECIPIENT = process.env.RECIPIENT;
 if (!RECIPIENT) throw new Error("set RECIPIENT=<G... address> in the environment");
+// The relayer submits the withdrawal and is paid FEE out of the note. Defaults
+// to the recipient with a zero fee, i.e. the recipient pays their own gas.
+const RELAYER = process.env.RELAYER || RECIPIENT;
+const FEE = BigInt(process.env.FEE || "0");
 const DENOM_STROOPS = process.env.DENOM_STROOPS || "10000000"; // 1 XLM
 
 // 32-byte big-endian hex (matches 05_export.mjs encoding for BytesN<32>).
@@ -66,7 +70,7 @@ async function main() {
   //   record = (identityField, nullifier). Build the KYC registry too.
   const identityRegistry = {};
   const audits = notes.map((n, i) => {
-    const idField = addressToField(IDENTITIES[i]);
+    const idField = labelToField(IDENTITIES[i]);
     identityRegistry[hex32(idField)] = IDENTITIES[i];
     return audit.encrypt(auditor.pubPacked, [idField, n.nullifier]);
   });
@@ -75,13 +79,13 @@ async function main() {
   [0, 1, 2, 3].forEach((i) => approved.insert(notes[i].commitment));
 
   // 3. Withdraw approved note #2, bound to the real recipient address.
-  const recipientField = addressToField(RECIPIENT);
   const input = buildWithdrawInput({
     note: notes[2],
     depositsTree: deposits,
     associationTree: approved,
-    recipient: recipientField,
-    fee: 0n,
+    recipient: RECIPIENT,
+    relayer: RELAYER,
+    fee: FEE,
   });
 
   console.log("generating real Groth16 proof bound to", RECIPIENT, "...");
@@ -94,7 +98,7 @@ async function main() {
     (await import("node:fs")).readFileSync("build/verification_key.json")
   );
   if (!(await snarkjs.groth16.verify(vkey, publicSignals, proof))) {
-    throw new Error("off-chain verify failed — aborting");
+    throw new Error("off-chain verify failed, aborting");
   }
 
   writeFileSync("build/proof.json", JSON.stringify(proof, null, 2));
@@ -104,6 +108,8 @@ async function main() {
   const onchain = {
     token_sac: process.env.TOKEN_SAC || null,
     recipient: RECIPIENT,
+    relayer: RELAYER,
+    fee: FEE.toString(),
     denom_stroops: DENOM_STROOPS,
     // every deposited commitment, as the contract's deposit() wants them
     commitments: notes.map((n) => hex32(n.commitment)),
@@ -112,7 +118,9 @@ async function main() {
     association_root: hex32(approved.root()),
     nullifier_hash: hex32(notes[WITHDRAWN].nullifierHash),
     withdrawn_index: WITHDRAWN,
-    // public inputs the circuit/contract expect: [root, assocRoot, nh, recip, fee]
+    // public inputs the circuit/contract expect:
+    // [root, assocRoot, nullifierHash,
+    //  recipientHi, recipientLo, relayerHi, relayerLo, fee]
     public_inputs: publicSignals.map(hex32),
     // auditor view-key + the regulator's KYC registry (off-chain in reality)
     auditor_pub_packed: auditor.pubPacked,

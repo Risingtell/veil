@@ -11,7 +11,7 @@ import { dirname, resolve } from "node:path";
 process.chdir(resolve(dirname(fileURLToPath(import.meta.url)), ".."));
 
 const PTAU = "build/pot_final.ptau";
-// 2^15 = 32768 constraints capacity — comfortably above our circuit size.
+// 2^15 = 32768 constraints capacity, comfortably above our circuit size.
 const PTAU_URLS = [
   "https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_15.ptau",
   "https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_15.ptau",

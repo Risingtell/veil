@@ -1,5 +1,5 @@
 #![no_std]
-//! # Veil — a compliant privacy pool for USDC on Stellar.
+//! # Veil: a compliant privacy pool for USDC on Stellar.
 //!
 //! This single contract bundles two things:
 //!
@@ -9,8 +9,8 @@
 //!
 //! 2. A **privacy pool** with a compliance (Association Set Provider) gate.
 //!    Users deposit a fixed denomination of USDC against a commitment, and
-//!    later withdraw to a fresh address by submitting a proof that — in zero
-//!    knowledge — shows their note is (a) a real deposit, (b) in the approved
+//!    later withdraw to a fresh address by submitting a proof that, in zero
+//!    knowledge, shows their note is (a) a real deposit, (b) in the approved
 //!    association set, and (c) not already spent (nullifier).
 //!
 //! The proof is produced off-chain with Circom/snarkjs (`circuits/withdraw.circom`).
@@ -23,6 +23,15 @@ use soroban_sdk::{
     crypto::bn254::{Bn254Fr, Bn254G1Affine, Bn254G2Affine},
     token, vec, Address, Bytes, BytesN, Env, U256, Vec,
 };
+
+mod address_bind;
+mod field;
+mod merkle;
+mod poseidon;
+mod poseidon_params;
+
+use merkle::Tree;
+use poseidon::Poseidon;
 
 /// Verification key, EIP-197 byte encoding. `ic` has (#public_inputs + 1) points.
 #[contracttype]
@@ -55,6 +64,17 @@ pub enum Error {
     BadAssociationRoot = 5,
     InvalidProof = 6,
     BadPublicInputs = 7,
+    /// A public input, or a deposited commitment, was not a canonical field
+    /// element (>= the BN254 scalar modulus). See `field.rs`.
+    NonCanonicalInput = 8,
+    /// The named payout address is not the one the proof commits to.
+    RecipientMismatch = 9,
+    /// The named relayer is not the one the proof commits to.
+    RelayerMismatch = 10,
+    /// The tree holds 2^LEVELS notes and cannot accept another deposit.
+    TreeFull = 11,
+    /// The fee claimed by the relayer is not less than the note denomination.
+    FeeTooLarge = 12,
 }
 
 #[contracttype]
@@ -63,11 +83,13 @@ pub enum DataKey {
     Token,
     Denom,
     Vk,
-    Auditor,               // BytesN<32>: packed BabyJubJub public key of the regulator
+    Auditor,     // BytesN<32>: packed BabyJubJub public key of the regulator
     AssocRoot,
-    Roots,                 // Vec<BytesN<32>>: registered deposit-tree roots
-    Commitments,           // Vec<BytesN<32>>: every deposited commitment (auditability)
-    Audits,                // Vec<Bytes>: encrypted audit record per deposit (parallel to Commitments)
+    TreeIndex,   // u32: number of leaves inserted
+    TreeSubtrees, // Vec<BytesN<32>>: incremental-tree left-sibling cache
+    Roots,       // Vec<BytesN<32>>: rolling window of contract-derived roots
+    Commitments, // Vec<BytesN<32>>: every deposited commitment (auditability)
+    Audits,      // Vec<Bytes>: encrypted audit record per deposit (parallel to Commitments)
     Nullifier(BytesN<32>), // spent markers
 }
 
@@ -95,20 +117,39 @@ impl Veil {
         env.storage().instance().set(&DataKey::Denom, &denom);
         env.storage().instance().set(&DataKey::Auditor, &auditor);
         env.storage().instance().set(&DataKey::Vk, &vk);
-        env.storage().persistent().set(&DataKey::Roots, &Vec::<BytesN<32>>::new(&env));
         env.storage().persistent().set(&DataKey::Commitments, &Vec::<BytesN<32>>::new(&env));
         env.storage().persistent().set(&DataKey::Audits, &Vec::<Bytes>::new(&env));
+        save_tree(&env, &Tree::empty(&env));
     }
 
     /// Deposit `denom` of the pool token against `commitment`
     /// (= Poseidon(nullifier, secret), computed client-side).
     ///
+    /// The commitment is appended to the contract's own Merkle tree and the new
+    /// root is derived here, so a root can only ever describe leaves that were
+    /// actually paid for. Returns the new root.
+    ///
     /// `audit` is an encrypted audit record (Poseidon-ElGamal over BabyJubJub)
     /// that only the auditor's view-key can open. It is published on-chain so
     /// the regulator's ability to de-anonymize never depends on the depositor
-    /// retaining off-chain data — privacy to the public, auditability by design.
-    pub fn deposit(env: Env, from: Address, commitment: BytesN<32>, audit: Bytes) {
+    /// retaining off-chain data. Privacy to the public, auditability by design.
+    pub fn deposit(
+        env: Env,
+        from: Address,
+        commitment: BytesN<32>,
+        audit: Bytes,
+    ) -> Result<BytesN<32>, Error> {
         from.require_auth();
+        // A non-canonical commitment would be reduced mod p by the hasher,
+        // letting two distinct stored commitments occupy one leaf value.
+        if !field::is_canonical(&commitment) {
+            return Err(Error::NonCanonicalInput);
+        }
+        let mut tree = load_tree(&env);
+        if tree.is_full() {
+            return Err(Error::TreeFull);
+        }
+
         let denom: i128 = get(&env, &DataKey::Denom);
         let token_addr: Address = get(&env, &DataKey::Token);
         token::TokenClient::new(&env, &token_addr).transfer(
@@ -116,6 +157,7 @@ impl Veil {
             &env.current_contract_address(),
             &denom,
         );
+
         let mut commits: Vec<BytesN<32>> =
             env.storage().persistent().get(&DataKey::Commitments).unwrap();
         commits.push_back(commitment.clone());
@@ -124,17 +166,13 @@ impl Veil {
             env.storage().persistent().get(&DataKey::Audits).unwrap();
         audits.push_back(audit);
         env.storage().persistent().set(&DataKey::Audits, &audits);
-        env.events().publish((soroban_sdk::symbol_short!("deposit"),), commitment);
-    }
 
-    /// Operator registers a new deposit-tree root (computed off-chain over the
-    /// recorded commitments with the same Poseidon used in-circuit).
-    pub fn publish_root(env: Env, root: BytesN<32>) {
-        admin(&env).require_auth();
-        let mut roots: Vec<BytesN<32>> =
-            env.storage().persistent().get(&DataKey::Roots).unwrap();
-        roots.push_back(root);
-        env.storage().persistent().set(&DataKey::Roots, &roots);
+        let poseidon = Poseidon::new(&env);
+        let root = tree.insert(&env, &poseidon, commitment.clone());
+        save_tree(&env, &tree);
+
+        env.events().publish((soroban_sdk::symbol_short!("deposit"),), commitment);
+        Ok(root)
     }
 
     /// ASP publishes the current approved-association-set root.
@@ -143,27 +181,49 @@ impl Veil {
         env.storage().instance().set(&DataKey::AssocRoot, &root);
     }
 
-    /// Withdraw `denom` to `recipient` against a valid ZK proof.
+    /// Withdraw `denom` against a valid ZK proof, paying `recipient` and, if a
+    /// fee was committed to, `relayer`.
     ///
     /// `public_inputs` order matches the circuit:
-    ///   [root, associationRoot, nullifierHash, recipient, fee]
+    ///   [root, associationRoot, nullifierHash,
+    ///    recipientHi, recipientLo, relayerHi, relayerLo, fee]
+    ///
+    /// Both payout addresses are re-derived from their committed limbs and
+    /// compared byte for byte. Naming any other address fails, which is what
+    /// stops a bystander from lifting a pending proof and redirecting it.
+    ///
+    /// The relayer exists because a genuinely fresh recipient holds no XLM and
+    /// cannot pay for its own withdrawal; a relayer submits the transaction and
+    /// takes `fee` out of the note. The fee is committed to in the proof, so a
+    /// relayer cannot raise it, and a third party cannot steal the job.
     pub fn withdraw(
         env: Env,
         proof: ProofBytes,
         public_inputs: Vec<BytesN<32>>,
         recipient: Address,
+        relayer: Address,
     ) -> Result<(), Error> {
-        if public_inputs.len() != 5 {
+        if public_inputs.len() != 8 {
             return Err(Error::BadPublicInputs);
         }
+        // Every input must be canonical before anything is compared or stored;
+        // otherwise a spent nullifier could reappear under a second encoding.
+        if !field::all_canonical(&public_inputs) {
+            return Err(Error::NonCanonicalInput);
+        }
+
         let root = public_inputs.get(0).unwrap();
         let assoc = public_inputs.get(1).unwrap();
         let nullifier = public_inputs.get(2).unwrap();
+        let recipient_hi = public_inputs.get(3).unwrap();
+        let recipient_lo = public_inputs.get(4).unwrap();
+        let relayer_hi = public_inputs.get(5).unwrap();
+        let relayer_lo = public_inputs.get(6).unwrap();
+        let fee = fee_to_i128(&public_inputs.get(7).unwrap())?;
 
-        // (a) the deposit root must be one we registered
-        let roots: Vec<BytesN<32>> =
-            env.storage().persistent().get(&DataKey::Roots).unwrap();
-        if !roots.iter().any(|r| r == root) {
+        // (a) the root must be one this contract derived itself
+        let tree = load_tree(&env);
+        if !tree.knows_root(&root) {
             return Err(Error::UnknownRoot);
         }
         // (b) the association root must match the ASP's current root
@@ -175,11 +235,28 @@ impl Veil {
         if asp != assoc {
             return Err(Error::BadAssociationRoot);
         }
-        // (c) nullifier must be unspent
+        // (c) the addresses being paid must be the ones committed to.
+        //
+        // Checked before the nullifier so the caller learns the most specific
+        // reason a call was refused. Order carries no security weight, since
+        // every check has to pass, but reporting "spent" for a request that was
+        // also addressed to the wrong payee hides the real objection.
+        if !address_bind::matches(&env, &recipient, &recipient_hi, &recipient_lo) {
+            return Err(Error::RecipientMismatch);
+        }
+        if !address_bind::matches(&env, &relayer, &relayer_hi, &relayer_lo) {
+            return Err(Error::RelayerMismatch);
+        }
+        // (d) the fee must leave something for the recipient
+        let denom: i128 = get(&env, &DataKey::Denom);
+        if fee >= denom {
+            return Err(Error::FeeTooLarge);
+        }
+        // (e) nullifier must be unspent
         if env.storage().persistent().has(&DataKey::Nullifier(nullifier.clone())) {
             return Err(Error::NullifierAlreadyUsed);
         }
-        // (d) the proof itself
+        // (f) the proof itself
         let vk: VkBytes = get(&env, &DataKey::Vk);
         if !groth16_verify(&env, &vk, &proof, &public_inputs) {
             return Err(Error::InvalidProof);
@@ -189,13 +266,13 @@ impl Veil {
         env.storage()
             .persistent()
             .set(&DataKey::Nullifier(nullifier.clone()), &true);
-        let denom: i128 = get(&env, &DataKey::Denom);
         let token_addr: Address = get(&env, &DataKey::Token);
-        token::TokenClient::new(&env, &token_addr).transfer(
-            &env.current_contract_address(),
-            &recipient,
-            &denom,
-        );
+        let client = token::TokenClient::new(&env, &token_addr);
+        let here = env.current_contract_address();
+        client.transfer(&here, &recipient, &(denom - fee));
+        if fee > 0 {
+            client.transfer(&here, &relayer, &fee);
+        }
         env.events()
             .publish((soroban_sdk::symbol_short!("withdraw"),), nullifier);
         Ok(())
@@ -203,9 +280,31 @@ impl Veil {
 
     /// Stateless verifier exposed for tests / external use: verify a proof
     /// against the stored verification key. Returns true iff valid.
+    ///
+    /// Applies the same canonical-encoding rule as `withdraw`, so this cannot
+    /// report a proof as valid under an encoding `withdraw` would refuse.
     pub fn verify_proof(env: Env, proof: ProofBytes, public_inputs: Vec<BytesN<32>>) -> bool {
+        if !field::all_canonical(&public_inputs) {
+            return false;
+        }
         let vk: VkBytes = get(&env, &DataKey::Vk);
         groth16_verify(&env, &vk, &proof, &public_inputs)
+    }
+
+    /// The current deposit-tree root, as derived by this contract.
+    pub fn root(env: Env) -> BytesN<32> {
+        load_tree(&env).current_root()
+    }
+
+    /// The window of roots a withdrawal proof may be built against, oldest
+    /// first. Every one of these was derived on-chain from paid-for deposits.
+    pub fn roots(env: Env) -> Vec<BytesN<32>> {
+        load_tree(&env).roots
+    }
+
+    /// Number of notes deposited so far, i.e. the next leaf index.
+    pub fn leaf_count(env: Env) -> u32 {
+        load_tree(&env).next_index
     }
 
     /// The regulator's view-key (packed BabyJubJub public key) declared at init.
@@ -229,6 +328,39 @@ impl Veil {
 
 fn admin(env: &Env) -> Address {
     get(env, &DataKey::Admin)
+}
+
+fn load_tree(env: &Env) -> Tree {
+    Tree {
+        next_index: get(env, &DataKey::TreeIndex),
+        filled_subtrees: get(env, &DataKey::TreeSubtrees),
+        roots: get(env, &DataKey::Roots),
+    }
+}
+
+fn save_tree(env: &Env, tree: &Tree) {
+    let p = env.storage().persistent();
+    p.set(&DataKey::TreeIndex, &tree.next_index);
+    p.set(&DataKey::TreeSubtrees, &tree.filled_subtrees);
+    p.set(&DataKey::Roots, &tree.roots);
+}
+
+/// Decode the `fee` public input into a token amount.
+///
+/// The circuit works in a 254-bit field but token amounts are `i128`, so a fee
+/// is only meaningful if it fits in the positive `i128` range. Anything larger
+/// is a malformed input rather than an enormous fee, and is rejected outright
+/// instead of being truncated into a small one.
+fn fee_to_i128(fee: &BytesN<32>) -> Result<i128, Error> {
+    let bytes = fee.to_array();
+    // Everything above the low 16 bytes must be zero, and the top bit of the
+    // remainder must be clear so the value is a non-negative i128.
+    if bytes[..16].iter().any(|b| *b != 0) || bytes[16] & 0x80 != 0 {
+        return Err(Error::BadPublicInputs);
+    }
+    let mut low = [0u8; 16];
+    low.copy_from_slice(&bytes[16..32]);
+    Ok(i128::from_be_bytes(low))
 }
 
 fn get<T: soroban_sdk::TryFromVal<Env, soroban_sdk::Val> + soroban_sdk::IntoVal<Env, soroban_sdk::Val>>(

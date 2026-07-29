@@ -7,7 +7,11 @@ import { dirname, resolve } from "node:path";
 // Run from project root regardless of where node was invoked.
 process.chdir(resolve(dirname(fileURLToPath(import.meta.url)), ".."));
 
-const circom = process.platform === "win32" ? "bin\\circom.exe" : "circom";
+import { ensureCircom } from "./00_fetch_circom.mjs";
+
+// The compiler is a platform binary and not committed, so fetch it on demand
+// rather than leaving it as a manual prerequisite a fresh clone would trip on.
+const circom = await ensureCircom();
 mkdirSync("build", { recursive: true });
 
 console.log("→ Compiling circuits/withdraw.circom ...");

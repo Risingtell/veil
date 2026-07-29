@@ -2,7 +2,7 @@ pragma circom 2.1.6;
 
 include "../node_modules/circomlib/circuits/poseidon.circom";
 
-// Poseidon hash of two field elements — used for every internal Merkle node.
+// Poseidon hash of two field elements, used for every internal Merkle node.
 // Poseidon is deliberately chosen: it is ZK-friendly AND is a native host
 // function on Stellar from Protocol 25 ("X-Ray") onward.
 template HashLeftRight() {

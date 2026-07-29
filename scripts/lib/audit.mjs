@@ -1,20 +1,18 @@
-// Veil — auditor view-key (selective disclosure).
+// Veil, auditor view-key (selective disclosure).
 //
 // A designated regulator holds a BabyJubJub keypair. At deposit time the
-// depositor encrypts an audit record — the depositor's identity and the note's
-// nullifier — to the auditor's PUBLIC key and publishes the ciphertext on-chain.
+// depositor encrypts an audit record, the depositor's identity and the note's
+// nullifier, to the auditor's PUBLIC key and publishes the ciphertext on-chain.
 //
 // The public learns nothing (commitments and nullifier hashes are unlinkable),
 // but the auditor can open any record with their PRIVATE key and, by hashing the
 // recovered nullifier, link a deposit to the exact withdrawal that spent it.
 //
-// Scheme: hybrid (ElGamal-style) encryption with a Poseidon stream cipher —
-//   r  <- random scalar         R = r·G                 (ephemeral pubkey)
+// Scheme: hybrid (ElGamal-style) encryption with a Poseidon stream cipher, //   r  <- random scalar         R = r·G                 (ephemeral pubkey)
 //   S  = r·AuditorPub           (= auditorPriv·R)        (shared secret point)
 //   ctᵢ = mᵢ + Poseidon(Sx, Sy, i)   mod p
 // BabyJubJub is defined over the BN254 scalar field, so every value (nullifier,
-// Sx, Sy, Poseidon output) lives in the SAME field as the circuit signals —
-// which is exactly what lets this be enforced in-circuit later if desired.
+// Sx, Sy, Poseidon output) lives in the SAME field as the circuit signals, // which is exactly what lets this be enforced in-circuit later if desired.
 import { buildBabyjub, buildPoseidon } from "circomlibjs";
 import { randomBytes } from "node:crypto";
 import { FIELD } from "./veil.mjs";

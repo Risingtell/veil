@@ -3,10 +3,10 @@
 // generated here will satisfy the constraints in withdraw.circom.
 
 import { buildPoseidon } from "circomlibjs";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 export const LEVELS = 20;
-// BN254 scalar field modulus — the field every signal lives in.
+// BN254 scalar field modulus: the field every signal lives in.
 export const FIELD =
   21888242871839275222246405745257275088548364400416034343698204186575808495617n;
 
@@ -95,22 +95,128 @@ export class MerkleTree {
   }
 }
 
-// Encode a Stellar/G... address (or any string) into a field element by
-// hashing its bytes down with Poseidon. Used to bind a withdrawal to a
-// specific recipient inside the proof.
-export function addressToField(str) {
-  const bytes = Buffer.from(str, "utf8");
-  let acc = 0n;
-  for (const b of bytes) acc = (acc * 256n + BigInt(b)) % FIELD;
-  return acc;
+// Encode an arbitrary label (an identity string in the auditor's registry)
+// into a field element. SHA-256 truncated to 248 bits: comfortably inside the
+// field, and collision-resistant, so two payroll records cannot share an
+// encrypted identity slot.
+export function labelToField(str) {
+  const digest = createHash("sha256").update(str, "utf8").digest();
+  return BigInt("0x" + digest.subarray(0, 31).toString("hex"));
+}
+
+// Encode a Stellar address into the two field elements the circuit commits to,
+// matching contracts/veil/src/address_bind.rs exactly.
+//
+// A Soroban address is a 32-byte payload plus a type discriminant (0 for an
+// account G..., 1 for a contract C...). That is 33 bytes, which does not fit in
+// one 254-bit field element, so it is split:
+//
+//   buf = [kind] ++ payload[0..32]     (33 bytes)
+//   hi  = big-endian buf[0..17]        (136 bits)
+//   lo  = big-endian buf[17..33]       (128 bits)
+//
+// The split is injective and involves no hashing, so the contract's check is a
+// plain byte comparison with nothing to collide.
+//
+// The previous encoding folded the 56-character strkey down modulo the field,
+// which was neither injective nor checked on-chain at all.
+export function addressToLimbs(strkey) {
+  const { kind, payload } = decodeStrkey(strkey);
+  const buf = Buffer.concat([Buffer.from([kind]), payload]);
+  const be = (slice) => BigInt("0x" + slice.toString("hex"));
+  return { hi: be(buf.subarray(0, 17)), lo: be(buf.subarray(17, 33)) };
+}
+
+// Decode a Stellar strkey (G... account or C... contract) to its raw 32-byte
+// payload, verifying the version byte and CRC-16 checksum rather than trusting
+// the string. A malformed address must fail here, not silently bind to
+// something the contract will refuse.
+export function decodeStrkey(strkey) {
+  const data = base32Decode(strkey);
+  if (data.length !== 35) {
+    throw new Error(`bad strkey length for ${strkey}`);
+  }
+  const version = data[0];
+  const payload = data.subarray(1, 33);
+  const checksum = data.readUInt16LE(33);
+  if (crc16(data.subarray(0, 33)) !== checksum) {
+    throw new Error(`bad strkey checksum for ${strkey}`);
+  }
+  // 6 << 3 = 0x30 -> 'G' (ed25519 public key); 2 << 3 = 0x10 -> 'C' (contract).
+  if (version === 6 << 3) return { kind: 0, payload };
+  if (version === 2 << 3) return { kind: 1, payload };
+  throw new Error(`unsupported strkey version byte 0x${version.toString(16)}`);
+}
+
+// Encode a 32-byte payload as a Stellar strkey. Used to mint valid demo
+// addresses rather than placeholder strings, so the demo exercises the same
+// decode-and-verify path a real address goes through.
+export function encodeStrkey(payload, kind = 0) {
+  if (payload.length !== 32) throw new Error("payload must be 32 bytes");
+  const version = kind === 0 ? 6 << 3 : 2 << 3;
+  const data = Buffer.concat([Buffer.from([version]), Buffer.from(payload)]);
+  const sum = Buffer.alloc(2);
+  sum.writeUInt16LE(crc16(data), 0);
+  return base32Encode(Buffer.concat([data, sum]));
+}
+
+const B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+function base32Encode(buf) {
+  let bits = 0;
+  let value = 0;
+  let out = "";
+  for (const b of buf) {
+    value = (value << 8) | b;
+    bits += 8;
+    while (bits >= 5) {
+      bits -= 5;
+      out += B32[(value >> bits) & 31];
+    }
+  }
+  if (bits > 0) out += B32[(value << (5 - bits)) & 31];
+  return out;
+}
+
+function base32Decode(s) {
+  let bits = 0;
+  let value = 0;
+  const out = [];
+  for (const ch of s.replace(/=+$/, "")) {
+    const idx = B32.indexOf(ch);
+    if (idx < 0) throw new Error(`invalid base32 character ${ch}`);
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      bits -= 8;
+      out.push((value >> bits) & 0xff);
+    }
+  }
+  return Buffer.from(out);
+}
+
+// CRC-16/XMODEM, as used by SEP-23 strkeys.
+function crc16(bytes) {
+  let crc = 0;
+  for (const b of bytes) {
+    crc ^= b << 8;
+    for (let i = 0; i < 8; i++) {
+      crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
+    }
+  }
+  return crc;
 }
 
 // Build the full witness input object for withdraw.circom.
+//
+// `recipient` and `relayer` are Stellar strkeys. `relayer` defaults to the
+// recipient with a zero fee, which is the "user pays their own gas" case.
 export function buildWithdrawInput({
   note,
   depositsTree,
   associationTree,
-  recipient, // field element
+  recipient, // strkey, e.g. "G..."
+  relayer = recipient,
   fee = 0n,
 }) {
   const di = depositsTree.indexOf(note.commitment);
@@ -121,13 +227,18 @@ export function buildWithdrawInput({
 
   const dp = depositsTree.proof(di);
   const ap = associationTree.proof(ai);
+  const r = addressToLimbs(recipient);
+  const l = addressToLimbs(relayer);
 
   return {
     // public
     root: depositsTree.root().toString(),
     associationRoot: associationTree.root().toString(),
     nullifierHash: note.nullifierHash.toString(),
-    recipient: recipient.toString(),
+    recipientHi: r.hi.toString(),
+    recipientLo: r.lo.toString(),
+    relayerHi: l.hi.toString(),
+    relayerLo: l.lo.toString(),
     fee: fee.toString(),
     // private
     nullifier: note.nullifier.toString(),

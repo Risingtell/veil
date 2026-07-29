@@ -1,4 +1,4 @@
-// Generate a professional 480x480 PNG logo for Veil — no external image libs.
+// Generate a professional 480x480 PNG logo for Veil, no external image libs.
 // Wordmark "VEIL" with a "ZK" accent below, on a deep indigo->blue gradient.
 import { deflateSync } from "node:zlib";
 import { writeFileSync } from "node:fs";

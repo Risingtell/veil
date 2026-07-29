@@ -10,10 +10,18 @@ crate-type = ["cdylib"]
 doctest = false
 
 [dependencies]
-soroban-sdk = "26"
+# "hazmat" unlocks two low-level SDK primitives this contract needs:
+#   - crypto::CryptoHazmat::poseidon_permutation, to hash Merkle nodes on-chain
+#     with the circuit's exact Poseidon parameters (see src/poseidon.rs)
+#   - Address::to_payload, to bind a withdrawal to the recipient's exact
+#     32 address bytes rather than a lossy encoding of them
+# Both are "hazardous" because they are unopinionated: misuse means wrong
+# parameters or a wrong-typed payload. Each is pinned down by a test —
+# poseidon_matches_circomlib and the recipient-binding tests respectively.
+soroban-sdk = { version = "26", features = ["hazmat"] }
 
 [dev-dependencies]
-soroban-sdk = { version = "26", features = ["testutils"] }
+soroban-sdk = { version = "26", features = ["testutils", "hazmat"] }
 
 [profile.release]
 opt-level = "z"

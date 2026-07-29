@@ -1,7 +1,7 @@
 {
   "name": "veil",
   "version": "0.1.0",
-  "description": "Veil — a Compliant Privacy Pool for USDC on Stellar. ZK (Circom/Groth16) proofs of deposit-membership + nullifier + approved-association-set, verified on-chain in a Soroban contract.",
+  "description": "Veil: a Compliant Privacy Pool for USDC on Stellar. ZK (Circom/Groth16) proofs of deposit-membership + nullifier + approved-association-set, verified on-chain in a Soroban contract.",
   "type": "module",
   "license": "MIT",
   "scripts": {

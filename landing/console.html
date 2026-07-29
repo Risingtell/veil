@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Veil Console. Verify the live contract yourself</title>
+<meta name="description" content="Run real read-only calls against the deployed Veil contract on Stellar testnet. Verify a Groth16 proof on-chain, read the contract-derived Merkle root, and watch a redirected withdrawal get rejected." />
+<link rel="icon" type="image/png" href="veil-logo.png" />
+<style>
+  :root{
+    --emerald:#059669; --emerald2:#10B981; --teal:#14B8A6;
+    --ink:#0B1B16; --muted:#5C6F68;
+    --bg:#FBFDFC; --card:#FFFFFF; --line:#E4EFE9; --soft:#F1F8F5;
+    --ok:#047857; --bad:#B42318; --badbg:#FEF3F2; --okbg:#ECFDF5;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{max-width:100%;overflow-x:hidden}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:var(--emerald)}
+  .mono,code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-wrap:anywhere}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 20px}
+
+  nav{position:sticky;top:0;z-index:10;backdrop-filter:blur(10px);
+    background:rgba(251,253,252,.85);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:62px;gap:12px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:16px}
+  .brand img{width:30px;height:30px;border-radius:8px}
+  .brand .zk{color:var(--teal)}
+  nav a.back{font-size:14px;color:var(--muted);text-decoration:none}
+  nav a.back:hover{color:var(--ink)}
+
+  header{padding:54px 0 26px}
+  .pill{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--emerald);
+    border:1px solid rgba(5,150,105,.28);background:rgba(5,150,105,.06);
+    padding:6px 13px;border-radius:999px;margin-bottom:18px;font-weight:600}
+  .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--emerald2)}
+  h1{font-size:40px;line-height:1.12;font-weight:800;letter-spacing:-1px;margin-bottom:14px}
+  .sub{font-size:17px;color:var(--muted);max-width:720px}
+  @media(max-width:680px){h1{font-size:30px}header{padding:38px 0 20px}}
+
+  .meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+  .chip{border:1px solid var(--line);background:var(--card);border-radius:10px;
+    padding:8px 12px;font-size:12.5px;color:var(--muted)}
+  .chip b{color:var(--ink);font-weight:600}
+
+  section{padding:26px 0 60px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:20px;margin-bottom:16px}
+  .card h3{font-size:17px;font-weight:700;margin-bottom:6px}
+  .card p.desc{color:var(--muted);font-size:14.5px;margin-bottom:14px}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  button{font:inherit;font-weight:600;font-size:14.5px;padding:11px 20px;border-radius:11px;
+    border:0;cursor:pointer;background:linear-gradient(135deg,var(--emerald),var(--teal));
+    color:#fff;box-shadow:0 8px 20px rgba(5,150,105,.24);transition:transform .12s ease,opacity .2s}
+  button:hover:not(:disabled){transform:translateY(-1px)}
+  button:disabled{opacity:.55;cursor:progress;box-shadow:none}
+  button.ghost{background:none;color:var(--ink);border:1px solid var(--line);box-shadow:none}
+  button.ghost:hover:not(:disabled){border-color:var(--emerald);color:var(--emerald)}
+
+  .out{margin-top:14px;border-radius:12px;padding:0;font-size:13.5px;display:none}
+  .out.show{display:block}
+  .out pre{background:#0B1B16;color:#D7EFE6;padding:14px 16px;border-radius:12px;
+    overflow-x:auto;white-space:pre-wrap;word-break:break-word;font-size:12.5px;line-height:1.55}
+  .verdict{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:12px;
+    font-size:14px;margin-bottom:10px;font-weight:600}
+  .verdict.ok{background:var(--okbg);color:var(--ok);border:1px solid rgba(4,120,87,.2)}
+  .verdict.bad{background:var(--badbg);color:var(--bad);border:1px solid rgba(180,35,24,.2)}
+  .verdict.info{background:var(--soft);color:var(--ink);border:1px solid var(--line)}
+
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:13.5px;margin-top:4px}
+  .kv dt{color:var(--muted)}
+  .kv dd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-wrap:anywhere}
+  @media(max-width:560px){.kv{grid-template-columns:1fr;gap:2px 0}.kv dd{margin-bottom:8px}}
+
+  footer{border-top:1px solid var(--line);padding:26px 0 44px;color:var(--muted);font-size:13.5px}
+  .note{background:var(--soft);border:1px solid var(--line);border-radius:12px;
+    padding:14px 16px;font-size:13.5px;color:var(--muted);margin-bottom:22px}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a class="brand" href="index.html" style="text-decoration:none;color:inherit">
+    <img src="veil-logo.png" alt="" /><span>VEIL<span class="zk">ZK</span></span>
+  </a>
+  <a class="back" href="index.html">Back to overview</a>
+</div></nav>
+
+<header><div class="wrap">
+  <div class="pill"><span class="dot"></span> Live on Stellar testnet</div>
+  <h1>Verify it yourself</h1>
+  <p class="sub">
+    Every button below sends a real call to the deployed Veil contract on Stellar
+    testnet and shows you exactly what came back. Nothing is recorded, mocked or
+    replayed. No wallet, no signup, no API key.
+  </p>
+  <div class="meta">
+    <span class="chip">Contract <b class="mono" id="cid"></b></span>
+    <span class="chip">Network <b>testnet</b></span>
+    <span class="chip">Verifier <b>Protocol 26 BN254</b></span>
+  </div>
+</div></header>
+
+<section><div class="wrap">
+
+  <div class="note">
+    The last three calls are executed as simulations, which run the contract for
+    real on a network node and return its actual result without submitting a
+    transaction. That is why they need no signing key from you, and why a
+    rejection here is the same rejection a submitted transaction would get.
+  </div>
+
+  <div class="card">
+    <h3>1. The Merkle tree is maintained on-chain</h3>
+    <p class="desc">
+      Reads <code>leaf_count</code> and <code>root</code> from the contract. There is no
+      <code>publish_root</code> function: the contract hashed every deposit into this tree
+      itself, using the same Poseidon parameters the circuit uses. So a root can only
+      ever describe notes that were actually paid for, and no operator can invent one.
+    </p>
+    <div class="row"><button data-act="tree">Read the tree</button></div>
+    <div class="out" id="out-tree"></div>
+  </div>
+
+  <div class="card">
+    <h3>2. A real Groth16 proof, verified on-chain</h3>
+    <p class="desc">
+      Sends a genuine Circom/snarkjs proof to <code>verify_proof</code>. The chain runs the
+      BN254 pairing check in its own host function and returns the answer. This is the
+      load-bearing step: the contract pays out nothing without it.
+    </p>
+    <div class="row"><button data-act="verify">Verify the proof on-chain</button></div>
+    <div class="out" id="out-verify"></div>
+  </div>
+
+  <div class="card">
+    <h3>3. Redirecting a valid proof is rejected</h3>
+    <p class="desc">
+      Takes that same valid proof and the same public inputs, unchanged, and asks the
+      contract to pay a different address. This is exactly what anyone watching the
+      network could attempt. The proof still verifies. The contract refuses anyway,
+      because the payee is not the one the proof commits to.
+    </p>
+    <div class="row"><button data-act="redirect">Try to steal the payout</button></div>
+    <div class="out" id="out-redirect"></div>
+  </div>
+
+  <div class="card">
+    <h3>4. Spending the note twice is rejected</h3>
+    <p class="desc">
+      This note was already withdrawn in
+      <a id="wtx" target="_blank" rel="noopener">a real transaction</a>. Replaying the
+      proof against the correct recipient asks the contract to pay it out again.
+    </p>
+    <div class="row"><button data-act="replay">Try to spend it twice</button></div>
+    <div class="out" id="out-replay"></div>
+  </div>
+
+</div></section>
+
+<footer><div class="wrap">
+  Veil is a research prototype on testnet and has not been audited. Source, tests and
+  the full security write-up are on
+  <a href="https://github.com/Risingtell/veil" target="_blank" rel="noopener">GitHub</a>.
+</div></footer>
+
+<script src="proof-data.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@stellar/stellar-sdk@13.1.0/dist/stellar-sdk.min.js"></script>
+<script>
+(function () {
+  var D = window.VEIL_DATA;
+  var RPC = "https://soroban-testnet.stellar.org";
+  document.getElementById("cid").textContent = D.contract;
+  var wtx = document.getElementById("wtx");
+  wtx.href = "https://stellar.expert/explorer/testnet/tx/" + D.withdrawTx;
+
+  function hexToBytes(hex) {
+    var out = new Uint8Array(hex.length / 2);
+    for (var i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16);
+    return out;
+  }
+  function bytesToHex(b) {
+    return Array.prototype.map
+      .call(b, function (x) { return ("0" + x.toString(16)).slice(-2); })
+      .join("");
+  }
+  function short(s, n) {
+    n = n || 10;
+    return s.length > n * 2 ? s.slice(0, n) + "…" + s.slice(-n) : s;
+  }
+
+  var S = window.StellarSdk;
+  var xdr = S.xdr;
+
+  // ProofBytes is a struct, which crosses the boundary as a map keyed by field
+  // name. Soroban requires map keys in sorted order, and a/b/c already are.
+  function proofScVal(p) {
+    function entry(k, hex) {
+      return new xdr.ScMapEntry({
+        key: xdr.ScVal.scvSymbol(k),
+        val: xdr.ScVal.scvBytes(hexToBytes(hex)),
+      });
+    }
+    return xdr.ScVal.scvMap([entry("a", p.a), entry("b", p.b), entry("c", p.c)]);
+  }
+  function publicInputsScVal(list) {
+    return xdr.ScVal.scvVec(
+      list.map(function (h) { return xdr.ScVal.scvBytes(hexToBytes(h)); })
+    );
+  }
+  function addr(a) { return new S.Address(a).toScVal(); }
+
+  var server = new S.rpc.Server(RPC);
+  var contract = new S.Contract(D.contract);
+
+  function simulate(method, args) {
+    return server.getAccount(D.sourceAccount).then(function (acc) {
+      var tx = new S.TransactionBuilder(acc, {
+        fee: S.BASE_FEE,
+        networkPassphrase: S.Networks.TESTNET,
+      })
+        .addOperation(contract.call.apply(contract, [method].concat(args)))
+        .setTimeout(30)
+        .build();
+      return server.simulateTransaction(tx);
+    });
+  }
+
+  // Map a contract error code back to the name in contracts/veil/src/lib.rs.
+  var ERRORS = {
+    3: "UnknownRoot", 4: "NullifierAlreadyUsed", 5: "BadAssociationRoot",
+    6: "InvalidProof", 7: "BadPublicInputs", 8: "NonCanonicalInput",
+    9: "RecipientMismatch", 10: "RelayerMismatch", 11: "TreeFull", 12: "FeeTooLarge",
+  };
+  function errorCode(sim) {
+    var text = JSON.stringify(sim && sim.error ? sim.error : sim);
+    var m = /Error\(Contract, #(\d+)\)/.exec(text);
+    return m ? parseInt(m[1], 10) : null;
+  }
+
+  function render(id, verdict, cls, detail) {
+    var el = document.getElementById(id);
+    el.className = "out show";
+    el.innerHTML = "";
+    var v = document.createElement("div");
+    v.className = "verdict " + cls;
+    v.textContent = verdict;
+    el.appendChild(v);
+    if (detail) {
+      var pre = document.createElement("pre");
+      pre.textContent = detail;
+      el.appendChild(pre);
+    }
+  }
+
+  var ACTIONS = {
+    tree: function () {
+      return Promise.all([simulate("leaf_count", []), simulate("root", [])]).then(
+        function (res) {
+          var leaves = S.scValToNative(res[0].result.retval);
+          var root = S.scValToNative(res[1].result.retval);
+          var rootHex = bytesToHex(root);
+          render(
+            "out-tree",
+            "The contract derived this tree itself, from " + leaves + " paid deposits.",
+            "ok",
+            "leaf_count = " + leaves + "\nroot       = " + rootHex +
+              "\n\nNo publish_root function exists on this contract."
+          );
+        }
+      );
+    },
+
+    verify: function () {
+      return simulate("verify_proof", [
+        proofScVal(D.proof),
+        publicInputsScVal(D.publicInputs),
+      ]).then(function (sim) {
+        var ok = S.scValToNative(sim.result.retval);
+        render(
+          "out-verify",
+          ok
+            ? "verify_proof returned true. The chain checked the pairing itself."
+            : "verify_proof returned false.",
+          ok ? "ok" : "bad",
+          "8 public signals, first is the deposits root:\n  " +
+            D.publicInputs.map(function (h) { return short(h, 12); }).join("\n  ")
+        );
+      });
+    },
+
+    redirect: function () {
+      return simulate("withdraw", [
+        proofScVal(D.proof),
+        publicInputsScVal(D.publicInputs),
+        addr(D.attacker),
+        addr(D.relayer),
+      ]).then(function (sim) {
+        var code = errorCode(sim);
+        if (code === 9) {
+          render(
+            "out-redirect",
+            "Rejected: Error #9 RecipientMismatch. The payout cannot be redirected.",
+            "ok",
+            "requested payee : " + D.attacker +
+              "\ncommitted payee : " + D.recipient +
+              "\n\nThe proof is valid. It simply does not authorise that address."
+          );
+        } else {
+          render(
+            "out-redirect",
+            code
+              ? "Rejected with Error #" + code + " (" + (ERRORS[code] || "?") + ")."
+              : "Unexpected: the redirect was not rejected.",
+            code === 4 ? "info" : "bad",
+            code === 4
+              ? "The note was already spent, so the nullifier check fired first."
+              : JSON.stringify(sim.error || sim, null, 2).slice(0, 900)
+          );
+        }
+      });
+    },
+
+    replay: function () {
+      return simulate("withdraw", [
+        proofScVal(D.proof),
+        publicInputsScVal(D.publicInputs),
+        addr(D.recipient),
+        addr(D.relayer),
+      ]).then(function (sim) {
+        var code = errorCode(sim);
+        render(
+          "out-replay",
+          code === 4
+            ? "Rejected: Error #4 NullifierAlreadyUsed. The note is spent."
+            : code
+            ? "Rejected with Error #" + code + " (" + (ERRORS[code] || "?") + ")."
+            : "Unexpected: the replay was not rejected.",
+          code === 4 ? "ok" : "bad",
+          "The nullifier hash is stored under its canonical bytes, and any other\n" +
+            "encoding of the same field element is refused before the proof is\n" +
+            "even checked, so there is no second spelling of a spent note."
+        );
+      });
+    },
+  };
+
+  document.querySelectorAll("button[data-act]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var act = btn.getAttribute("data-act");
+      var label = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Calling the network…";
+      ACTIONS[act]()
+        .catch(function (e) {
+          render("out-" + act, "The call could not be completed.", "bad", String(e && e.message ? e.message : e));
+        })
+        .then(function () {
+          btn.disabled = false;
+          btn.textContent = label;
+        });
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -16,10 +16,10 @@ build/*.wtns
 contracts/**/target/
 target/
 
-# large local tool binaries; documented in README how to fetch them
-bin/circom.exe
-bin/stellar.exe
-bin/*.tar.gz
+# large local tool binaries; scripts/00_fetch_circom.mjs downloads circom on
+# demand, and the Stellar CLI is only needed for the live testnet steps.
+bin/
+
 
 # misc
 .DS_Store
@@ -27,6 +27,16 @@ bin/*.tar.gz
 
 # generated demo artifact (contains a throwaway auditor private key)
 build/onchain.json
+
+# the demo note's PRIVATE circuit inputs (nullifier + secret). Regenerable, and
+# publishing witness data in a privacy project is the wrong signal.
+build/witness_input.json
+
+# internal working documents: reviewer correspondence, video shot-list, and the
+# running progress log. Useful while building, not part of the published project.
+FEEDBACK.md
+VIDEO_SCRIPT.md
+PROGRESS.md
 
 # vercel project link metadata
 landing/.vercel/

@@ -30,18 +30,27 @@ template CommitmentHasher() {
 //   (1) they know the opening of a commitment,
 //   (2) that commitment is a leaf of the full deposits tree   (root),
 //   (3) that SAME commitment is also a leaf of the approved
-//       association tree (associationRoot) — i.e. it belongs to the
+//       association tree (associationRoot), i.e. it belongs to the
 //       compliant subset, which is what makes the privacy auditable,
 //   (4) the revealed nullifierHash matches the note (anti double-spend).
-// `recipient` and `fee` are folded in to bind the proof to a specific
-// payout and defeat front-running / proof malleability.
+//
+// The payout addresses and the fee are folded in so the proof is worthless to
+// anyone who wants to redirect it. A Stellar address does not fit in one field
+// element: it is a 32-byte payload plus a type discriminant, so it is carried
+// as two limbs, `Hi` = the type byte and the first 16 payload bytes, `Lo` = the
+// remaining 16. The contract re-derives both from the address it is about to
+// pay and compares them (see contracts/veil/src/address_bind.rs), which is what
+// makes the commitment binding rather than decorative.
 template Withdraw(levels) {
     // ---- public inputs ----
     signal input root;             // Merkle root of ALL deposits
     signal input associationRoot;  // Merkle root of APPROVED (compliant) subset
     signal input nullifierHash;    // revealed; contract stores it to block reuse
-    signal input recipient;        // payout address (field-encoded)
-    signal input fee;              // relayer fee (field-encoded)
+    signal input recipientHi;      // recipient address, high limb (type + 16 bytes)
+    signal input recipientLo;      // recipient address, low limb (16 bytes)
+    signal input relayerHi;        // relayer address, high limb
+    signal input relayerLo;        // relayer address, low limb
+    signal input fee;              // amount paid to the relayer out of the note
 
     // ---- private inputs ----
     signal input nullifier;
@@ -75,12 +84,30 @@ template Withdraw(levels) {
     }
     atree.root === associationRoot;
 
-    // Bind recipient & fee into the constraint system (Tornado-style)
-    // so a relayer cannot tamper with the destination or fee.
-    signal recipientSq;
-    recipientSq <== recipient * recipient;
+    // Bind the payout addresses and the fee into the constraint system
+    // (Tornado-style): squaring each one forces it to appear in a real
+    // constraint, so it cannot be varied after the fact without invalidating
+    // the proof. Without this the signals would be optimised away and the
+    // proof would say nothing about who gets paid.
+    signal recipientHiSq;
+    recipientHiSq <== recipientHi * recipientHi;
+    signal recipientLoSq;
+    recipientLoSq <== recipientLo * recipientLo;
+    signal relayerHiSq;
+    relayerHiSq <== relayerHi * relayerHi;
+    signal relayerLoSq;
+    relayerLoSq <== relayerLo * relayerLo;
     signal feeSq;
     feeSq <== fee * fee;
 }
 
-component main {public [root, associationRoot, nullifierHash, recipient, fee]} = Withdraw(20);
+component main {public [
+    root,
+    associationRoot,
+    nullifierHash,
+    recipientHi,
+    recipientLo,
+    relayerHi,
+    relayerLo,
+    fee
+]} = Withdraw(20);
