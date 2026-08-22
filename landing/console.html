@@ -254,6 +254,77 @@
     }
   }
 
+  // Tell a transport failure apart from an answer that actually came from the
+  // chain. Every action starts by fetching the source account, so a blocked
+  // request surfaced as "Account not found", which reads to a stranger like the
+  // contract is gone when the real cause is their own connection.
+  var NETWORK_HINT =
+    "This is a connection problem on this machine, not a problem with the\n" +
+    "contract. The usual causes are a VPN or company proxy intercepting the\n" +
+    "request, an ad blocker, or no internet connection.\n\n" +
+    "Nothing on chain is affected. Try again on a direct connection.";
+
+  function looksLikeTransport(msg) {
+    return /failed to fetch|networkerror|load failed|err_|timeout|timed out|econn|proxy|socket|cors|407|502|503|504|unexpected token/i.test(
+      msg
+    );
+  }
+
+  // Ask the RPC whether it is reachable from this browser at all.
+  function rpcReachable() {
+    return fetch(RPC, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getHealth" }),
+    })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { return !!(j && j.result); })
+      .catch(function () { return false; });
+  }
+
+  function explainFailure(id, e) {
+    var msg = String(e && e.message ? e.message : e);
+    // The SDK reports an empty ledger-entry lookup for the source account as
+    // "Account not found", which a blocked response produces just as readily as
+    // a genuinely missing account. Probe the RPC to tell the two apart.
+    var missingSource =
+      msg.indexOf("Account not found") !== -1 &&
+      msg.indexOf(D.sourceAccount.slice(0, 8)) !== -1;
+
+    if (!looksLikeTransport(msg) && !missingSource) {
+      render(id, "The call could not be completed.", "bad", msg);
+      return;
+    }
+
+    return rpcReachable().then(function (up) {
+      if (!up) {
+        render(
+          id,
+          "Could not reach the Stellar testnet RPC from this browser.",
+          "info",
+          NETWORK_HINT + "\n\nUnderlying error:\n" + msg
+        );
+      } else if (missingSource) {
+        render(
+          id,
+          "The RPC is reachable, but this demo's source account is missing.",
+          "bad",
+          "Source account " + D.sourceAccount + "\n" +
+            "is not on testnet. That normally means testnet was reset, which\n" +
+            "wipes every account and contract on it.\n\nUnderlying error:\n" + msg
+        );
+      } else {
+        render(
+          id,
+          "The call could not be completed.",
+          "bad",
+          "The RPC is reachable, so this is not a connection problem.\n\n" +
+            "Underlying error:\n" + msg
+        );
+      }
+    });
+  }
+
   var ACTIONS = {
     tree: function () {
       return Promise.all([simulate("leaf_count", []), simulate("root", [])]).then(
@@ -354,7 +425,7 @@
       btn.textContent = "Calling the network…";
       ACTIONS[act]()
         .catch(function (e) {
-          render("out-" + act, "The call could not be completed.", "bad", String(e && e.message ? e.message : e));
+          return explainFailure("out-" + act, e);
         })
         .then(function () {
           btn.disabled = false;
