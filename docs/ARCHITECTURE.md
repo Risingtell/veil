@@ -30,16 +30,24 @@ Stellar testnet. Mainnet deployment is not part of this award.
 
 ```mermaid
 flowchart LR
-    D[Depositor] -->|deposit: commitment + encrypted audit record + token| C
-    C[Veil pool contract<br/>Soroban] -->|appends leaf, derives root| T[(On-chain Merkle tree<br/>depth 20)]
-    C -->|stores| A[(Encrypted audit records)]
-    ASP[Association Set Provider] -->|set_association_root| C
-    W[Withdrawer] -->|Groth16 proof generated off-chain| R[Relayer]
-    R -->|withdraw: proof + 8 public inputs| C
-    C -->|BN254 pairing_check| V{valid?}
-    V -->|yes| P[Recipient paid via SAC<br/>relayer paid fee]
-    AUD[Auditor with view key] -.->|decrypts records off-chain| A
+    D[Depositor] -->|deposit| C[Veil pool]
+    ASP[ASP] -->|approved root| C
+    C -->|new leaf| T[(Merkle tree)]
+    C -->|stores| A[(Audit records)]
+    W[Withdrawer] -->|proof| R[Relayer]
+    R -->|withdraw| C
+    C -->|pairing check| V{Valid?}
+    V -->|yes| P[Payee paid]
+    AUD[Auditor] -.->|decrypts| A
 ```
+
+A deposit carries the token, a commitment and an encrypted audit record. The
+contract appends the commitment to its own Merkle tree (depth 20) and derives
+the new root. The withdrawer builds a Groth16 proof off-chain and a relayer
+submits it with the 8 public inputs. The contract checks it with the BN254
+`pairing_check` host function, then pays the recipient and the relayer's fee
+through the Stellar Asset Contract. The auditor decrypts records off-chain with
+the view key.
 
 ### 1.1 The proof
 
@@ -106,40 +114,23 @@ These come from reading our own code, and each one maps to a deliverable below.
 ## 2. Target architecture (end of this award, on testnet)
 
 ```mermaid
-flowchart TB
-    subgraph users [Users]
-      EMP[Employer or NGO<br/>funds payroll]
-      REC[Recipient<br/>fresh wallet]
-      OFF[Compliance officer<br/>view key]
-    end
-
-    subgraph apps [Veil apps]
-      WEB[Veil web app<br/>Stellar Wallets Kit + in-browser proving]
-      ASPC[ASP console<br/>approve or revoke]
-      AUDC[Auditor console<br/>decrypt + trace]
-    end
-
-    subgraph services [Services]
-      REL[Relayer service<br/>open source]
-      MON[Monitor<br/>RPC indexer + alerts]
-      SDK[veil-sdk<br/>TypeScript, npm]
-    end
-
-    subgraph chain [Stellar testnet]
-      POOL[Veil pool v2<br/>one instance per USDC denomination]
-      USDC[(Testnet USDC SAC)]
-    end
-
-    EMP --> WEB --> POOL
-    REC --> WEB --> REL --> POOL
-    ASPC --> POOL
-    OFF --> AUDC
-    POOL --> USDC
-    POOL -. events .-> MON
-    POOL -. events .-> AUDC
-    WEB --- SDK
-    REL --- SDK
+flowchart LR
+    EMP[Employer] --> WEB[Web app]
+    REC[Recipient] --> WEB
+    WEB -->|deposit| POOL[Veil pool v2]
+    WEB -->|proof| REL[Relayer]
+    REL -->|withdraw| POOL
+    OPS[ASP operator] --> ASPC[ASP console]
+    ASPC -->|approved root| POOL
+    POOL -->|pays| USDC[(USDC SAC)]
+    POOL -.->|events| MON[Monitor]
+    POOL -.->|events| AUDC[Auditor console]
+    OFF[Auditor] --> AUDC
 ```
+
+Everything in this picture runs on Stellar testnet. There is one pool instance
+per USDC denomination. The web app, the relayer and both consoles share one
+client library, which is published on npm as **veil-sdk** in tranche #3.
 
 ### 2.1 Contract v2
 
@@ -224,9 +215,9 @@ contributor discarded their randomness.
 ### 2.8 veil-sdk
 
 A TypeScript package on npm that wraps note creation, proving, deposit,
-withdraw, tree rebuilding from events, and audit decryption. The web app and
-the relayer are built on it, so integrators get the same code that runs in
-production on testnet.
+withdraw, tree rebuilding from events, and audit decryption. It is the client
+library the web app and the relayer already use, packaged and documented, so
+integrators get the same code that runs on testnet.
 
 ---
 
