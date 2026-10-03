@@ -6,113 +6,139 @@
 <title>Veil Console. Verify the live contract yourself</title>
 <meta name="description" content="Run real read-only calls against the deployed Veil contract on Stellar testnet. Verify a Groth16 proof on-chain, read the contract-derived Merkle root, and watch a redirected withdrawal get rejected." />
 <link rel="icon" type="image/png" href="veil-logo.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <style>
   :root{
-    --emerald:#059669; --emerald2:#10B981; --teal:#14B8A6;
-    --ink:#0B1B16; --muted:#5C6F68;
-    --bg:#FBFDFC; --card:#FFFFFF; --line:#E4EFE9; --soft:#F1F8F5;
-    --ok:#047857; --bad:#B42318; --badbg:#FEF3F2; --okbg:#ECFDF5;
+    --ink:#0B1B16; --ink2:#0F241D; --mint:#34D399; --mint2:#6EE7B7; --emerald:#047857;
+    --paper:#F4F8F6; --white:#FFFFFF; --line:#DCE8E2; --muted:#4F625B;
+    --dline:rgba(255,255,255,.10); --dtext:#C9DDD4; --dmuted:#8FA89E;
+    --ok:#047857; --okbg:#ECFDF5; --bad:#B42318; --badbg:#FEF3F2; --wait:#6B7F78;
+    --max:1280px; --pad:clamp(1.25rem,5vw,4.5rem);
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{max-width:100%;overflow-x:hidden}
-  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    background:var(--bg);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased}
+  body{font-family:Inter,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--paper);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased}
   a{color:var(--emerald)}
-  .mono,code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-wrap:anywhere}
-  .wrap{max-width:1060px;margin:0 auto;padding:0 20px}
+  .mono,code,pre{font-family:var(--mono);overflow-wrap:anywhere}
+  code{font-size:.9em;background:rgba(4,120,87,.08);padding:.05rem .35rem}
+  .shell{max-width:var(--max);margin:0 auto;padding:0 var(--pad)}
 
-  nav{position:sticky;top:0;z-index:10;backdrop-filter:blur(10px);
-    background:rgba(251,253,252,.85);border-bottom:1px solid var(--line)}
-  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:62px;gap:12px}
-  .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:16px}
-  .brand img{width:30px;height:30px;border-radius:8px}
-  .brand .zk{color:var(--teal)}
-  nav a.back{font-size:14px;color:var(--muted);text-decoration:none}
-  nav a.back:hover{color:var(--ink)}
+  nav{position:sticky;top:0;z-index:20;background:rgba(11,27,22,.9);backdrop-filter:saturate(160%) blur(14px);
+    border-bottom:1px solid var(--dline);color:#fff}
+  nav .shell{display:flex;align-items:center;justify-content:space-between;height:68px;gap:12px}
+  .brand{display:flex;align-items:center;gap:.7rem;font-weight:900;letter-spacing:.14em;font-size:1rem;color:#fff;text-decoration:none}
+  .brand img{width:36px;height:36px}
+  .brand .zk{color:var(--mint)}
+  nav a.back{font-size:.92rem;color:var(--dtext);text-decoration:none}
+  nav a.back:hover{color:var(--mint)}
 
-  header{padding:54px 0 26px}
-  .pill{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--emerald);
-    border:1px solid rgba(5,150,105,.28);background:rgba(5,150,105,.06);
-    padding:6px 13px;border-radius:999px;margin-bottom:18px;font-weight:600}
-  .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--emerald2)}
-  h1{font-size:40px;line-height:1.12;font-weight:800;letter-spacing:-1px;margin-bottom:14px}
-  .sub{font-size:17px;color:var(--muted);max-width:720px}
-  @media(max-width:680px){h1{font-size:30px}header{padding:38px 0 20px}}
+  header{background:var(--ink);color:#fff;padding:clamp(3.5rem,7vw,6rem) 0 clamp(2.5rem,5vw,3.5rem);position:relative;overflow:hidden}
+  header::before{content:"";position:absolute;inset:0;pointer-events:none;
+    background-image:linear-gradient(rgba(52,211,153,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(52,211,153,.07) 1px,transparent 1px);
+    background-size:96px 96px;mask-image:linear-gradient(180deg,#000 20%,transparent 100%)}
+  header .shell{position:relative}
+  .pill{display:inline-flex;align-items:center;gap:.6rem;font-family:var(--mono);font-size:.75rem;letter-spacing:.16em;
+    text-transform:uppercase;font-weight:600;color:var(--mint);border:1px solid rgba(52,211,153,.45);
+    background:rgba(52,211,153,.08);padding:.5rem .9rem;margin-bottom:1.75rem}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--mint);animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(52,211,153,.55)}70%{box-shadow:0 0 0 10px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
+  h1{font-size:clamp(2.6rem,6.5vw,5.75rem);line-height:.98;font-weight:900;letter-spacing:-.045em}
+  h1 .hl{color:var(--mint)}
+  .sub{font-size:clamp(1.02rem,1.3vw,1.2rem);color:var(--dtext);max-width:46rem;margin-top:1.25rem}
 
-  .meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
-  .chip{border:1px solid var(--line);background:var(--card);border-radius:10px;
-    padding:8px 12px;font-size:12.5px;color:var(--muted)}
-  .chip b{color:var(--ink);font-weight:600}
+  .meta{display:grid;grid-template-columns:2.2fr 1fr 1fr 1fr;gap:1px;background:var(--dline);border:1px solid var(--dline);margin-top:2.5rem}
+  .meta div{background:var(--ink);padding:1rem 1.15rem;min-width:0}
+  .meta .k{font-family:var(--mono);font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;color:var(--dmuted);font-weight:600}
+  .meta .v{font-family:var(--mono);font-size:.85rem;color:#fff;margin-top:.35rem;overflow-wrap:anywhere}
+  @media(max-width:900px){.meta{grid-template-columns:1fr 1fr}.meta > div:first-child,.meta > div:last-child{grid-column:1/-1}}
 
-  section{padding:26px 0 60px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
-    padding:20px;margin-bottom:16px}
-  .card h3{font-size:17px;font-weight:700;margin-bottom:6px}
-  .card p.desc{color:var(--muted);font-size:14.5px;margin-bottom:14px}
-  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  button{font:inherit;font-weight:600;font-size:14.5px;padding:11px 20px;border-radius:11px;
-    border:0;cursor:pointer;background:linear-gradient(135deg,var(--emerald),var(--teal));
-    color:#fff;box-shadow:0 8px 20px rgba(5,150,105,.24);transition:transform .12s ease,opacity .2s}
-  button:hover:not(:disabled){transform:translateY(-1px)}
-  button:disabled{opacity:.55;cursor:progress;box-shadow:none}
-  button.ghost{background:none;color:var(--ink);border:1px solid var(--line);box-shadow:none}
-  button.ghost:hover:not(:disabled){border-color:var(--emerald);color:var(--emerald)}
+  .runbar{display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;margin-top:2rem}
+  .board{display:flex;gap:.5rem;flex-wrap:wrap}
 
-  .out{margin-top:14px;border-radius:12px;padding:0;font-size:13.5px;display:none}
+  button{font:inherit;font-weight:700;font-size:1rem;padding:.95rem 1.5rem;border:2px solid var(--ink);cursor:pointer;
+    background:var(--ink);color:#fff;transition:background .15s,color .15s,opacity .2s}
+  button:hover:not(:disabled){background:transparent;color:var(--ink)}
+  button:disabled{opacity:.55;cursor:progress}
+  button.mint{background:var(--mint);border-color:var(--mint);color:var(--ink)}
+  button.mint:hover:not(:disabled){background:transparent;color:var(--mint)}
+
+  .tag{display:inline-flex;align-items:center;gap:.4rem;font-family:var(--mono);font-size:.68rem;letter-spacing:.14em;
+    text-transform:uppercase;font-weight:600;padding:.3rem .55rem;border:1px solid var(--line);color:var(--wait);white-space:nowrap}
+  .tag.run{color:#975A16;border-color:rgba(151,90,22,.45)}
+  .tag.pass{color:var(--ok);border-color:rgba(4,120,87,.45);background:var(--okbg)}
+  .tag.fail{color:var(--bad);border-color:rgba(180,35,24,.45);background:var(--badbg)}
+  .tag.info{color:var(--ink);border-color:var(--line);background:var(--paper)}
+  header .tag{color:var(--dmuted);border-color:var(--dline)}
+  header .tag.pass{background:rgba(52,211,153,.12);color:var(--mint);border-color:rgba(52,211,153,.5)}
+  header .tag.fail{background:rgba(180,35,24,.18);color:#FCA5A5;border-color:rgba(252,165,165,.5)}
+  header .tag.run{color:#FBD38D;border-color:rgba(251,211,141,.5)}
+  header .tag.info{background:transparent;color:var(--dtext);border-color:var(--dline)}
+
+  section{padding:clamp(2.5rem,5vw,4rem) 0 clamp(4rem,8vw,6rem)}
+  .note{border-left:3px solid var(--mint);background:#fff;padding:1rem 1.25rem;font-size:.95rem;color:var(--muted);margin-bottom:2rem;max-width:62rem}
+  .checks{display:grid;gap:1px;background:var(--line);border:1px solid var(--line)}
+  .card{background:#fff;padding:clamp(1.5rem,3vw,2.25rem);display:grid;grid-template-columns:4.5rem minmax(0,1fr);gap:0 1.5rem}
+  .card .no{font-family:var(--mono);font-size:clamp(1.6rem,2.6vw,2.25rem);font-weight:600;color:var(--emerald);line-height:1}
+  .card .head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
+  .card h3{font-size:clamp(1.2rem,1.8vw,1.5rem);font-weight:800;letter-spacing:-.02em;line-height:1.2}
+  .card p.desc{color:var(--muted);font-size:1rem;margin:.6rem 0 1.25rem;max-width:56rem}
+  @media(max-width:640px){.card{grid-template-columns:1fr}.card .no{margin-bottom:.75rem}}
+
+  .out{margin-top:1.25rem;display:none}
   .out.show{display:block}
-  .out pre{background:#0B1B16;color:#D7EFE6;padding:14px 16px;border-radius:12px;
-    overflow-x:auto;white-space:pre-wrap;word-break:break-word;font-size:12.5px;line-height:1.55}
-  .verdict{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:12px;
-    font-size:14px;margin-bottom:10px;font-weight:600}
-  .verdict.ok{background:var(--okbg);color:var(--ok);border:1px solid rgba(4,120,87,.2)}
-  .verdict.bad{background:var(--badbg);color:var(--bad);border:1px solid rgba(180,35,24,.2)}
-  .verdict.info{background:var(--soft);color:var(--ink);border:1px solid var(--line)}
+  .out pre{background:var(--ink);color:#D7EFE6;padding:1rem 1.15rem;overflow-x:auto;white-space:pre-wrap;
+    word-break:break-word;font-size:.82rem;line-height:1.65}
+  .verdict{padding:.8rem 1rem;font-size:.98rem;font-weight:700;border-left:3px solid}
+  .verdict.ok{background:var(--okbg);color:var(--ok);border-color:var(--ok)}
+  .verdict.bad{background:var(--badbg);color:var(--bad);border-color:var(--bad)}
+  .verdict.info{background:var(--paper);color:var(--ink);border-color:var(--wait)}
 
-  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:13.5px;margin-top:4px}
-  .kv dt{color:var(--muted)}
-  .kv dd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-wrap:anywhere}
-  @media(max-width:560px){.kv{grid-template-columns:1fr;gap:2px 0}.kv dd{margin-bottom:8px}}
-
-  footer{border-top:1px solid var(--line);padding:26px 0 44px;color:var(--muted);font-size:13.5px}
-  .note{background:var(--soft);border:1px solid var(--line);border-radius:12px;
-    padding:14px 16px;font-size:13.5px;color:var(--muted);margin-bottom:22px}
+  footer{background:var(--ink);color:var(--dtext);padding:2.5rem 0;font-size:.92rem}
+  footer a{color:var(--mint)}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 
-<nav><div class="wrap">
-  <a class="brand" href="index.html" style="text-decoration:none;color:inherit">
-    <img src="veil-logo.png" alt="" /><span>VEIL<span class="zk">ZK</span></span>
-  </a>
-  <a class="back" href="index.html">Back to overview</a>
+<nav><div class="shell">
+  <a class="brand" href="index.html"><img src="veil-logo.png" alt="" />VEIL<span class="zk">ZK</span></a>
+  <a class="back" href="index.html">&larr; Back to overview</a>
 </div></nav>
 
-<header><div class="wrap">
-  <div class="pill"><span class="dot"></span> Live on Stellar testnet</div>
-  <h1>Verify it yourself</h1>
-  <p class="sub">
-    Every button below sends a real call to the deployed Veil contract on Stellar
-    testnet and shows you exactly what came back. Nothing is recorded, mocked or
-    replayed. No wallet, no signup, no API key.
-  </p>
+<header><div class="shell">
+  <div class="pill"><span class="dot"></span>Live on Stellar testnet</div>
+  <h1>Verify Veil <span class="hl">yourself.</span></h1>
+  <p class="sub">Each check below sends a real call to the deployed Veil contract on Stellar testnet and shows exactly what came back. Nothing is recorded, mocked or replayed. No wallet, no signup, no API key.</p>
   <div class="meta">
-    <span class="chip">Contract <b class="mono" id="cid"></b></span>
-    <span class="chip">Network <b>testnet</b></span>
-    <span class="chip">Verifier <b>Protocol 26 BN254</b></span>
+    <div><div class="k">Contract</div><div class="v" id="cid"></div></div>
+    <div><div class="k">Network</div><div class="v">Stellar testnet</div></div>
+    <div><div class="k">Protocol now</div><div class="v" id="proto">checking&hellip;</div></div>
+    <div><div class="k">Verifier</div><div class="v">BN254 host functions</div></div>
+  </div>
+  <div class="runbar">
+    <button class="mint" id="runall">Run all four checks</button>
+    <div class="board" aria-live="polite">
+      <span class="tag" id="b-tree">1 Waiting</span>
+      <span class="tag" id="b-verify">2 Waiting</span>
+      <span class="tag" id="b-redirect">3 Waiting</span>
+      <span class="tag" id="b-replay">4 Waiting</span>
+    </div>
   </div>
 </div></header>
 
-<section><div class="wrap">
+<section><div class="shell">
 
   <div class="note">
-    The last three calls are executed as simulations, which run the contract for
-    real on a network node and return its actual result without submitting a
-    transaction. That is why they need no signing key from you, and why a
-    rejection here is the same rejection a submitted transaction would get.
+    Checks 2 to 4 run as simulations: a network node executes the contract for real and returns its actual result, without submitting a transaction. That is why no signing key is needed, and why a rejection here is the same rejection a submitted transaction would get.
   </div>
 
-  <div class="card">
-    <h3>1. The Merkle tree is maintained on-chain</h3>
+  <div class="checks">
+  <div class="card"><div class="no">01</div><div>
+    <div class="head"><h3>The Merkle tree is maintained on-chain</h3><span class="tag" id="t-tree">Waiting</span></div>
     <p class="desc">
       Reads <code>leaf_count</code> and <code>root</code> from the contract. There is no
       <code>publish_root</code> function: the contract hashed every deposit into this tree
@@ -121,10 +147,10 @@
     </p>
     <div class="row"><button data-act="tree">Read the tree</button></div>
     <div class="out" id="out-tree"></div>
-  </div>
+  </div></div>
 
-  <div class="card">
-    <h3>2. A real Groth16 proof, verified on-chain</h3>
+  <div class="card"><div class="no">02</div><div>
+    <div class="head"><h3>A real Groth16 proof, verified on-chain</h3><span class="tag" id="t-verify">Waiting</span></div>
     <p class="desc">
       Sends a genuine Circom/snarkjs proof to <code>verify_proof</code>. The chain runs the
       BN254 pairing check in its own host function and returns the answer. This is the
@@ -132,10 +158,10 @@
     </p>
     <div class="row"><button data-act="verify">Verify the proof on-chain</button></div>
     <div class="out" id="out-verify"></div>
-  </div>
+  </div></div>
 
-  <div class="card">
-    <h3>3. Redirecting a valid proof is rejected</h3>
+  <div class="card"><div class="no">03</div><div>
+    <div class="head"><h3>Redirecting a valid proof is rejected</h3><span class="tag" id="t-redirect">Waiting</span></div>
     <p class="desc">
       Takes that same valid proof and the same public inputs, unchanged, and asks the
       contract to pay a different address. This is exactly what anyone watching the
@@ -144,10 +170,10 @@
     </p>
     <div class="row"><button data-act="redirect">Try to steal the payout</button></div>
     <div class="out" id="out-redirect"></div>
-  </div>
+  </div></div>
 
-  <div class="card">
-    <h3>4. Spending the note twice is rejected</h3>
+  <div class="card"><div class="no">04</div><div>
+    <div class="head"><h3>Spending the note twice is rejected</h3><span class="tag" id="t-replay">Waiting</span></div>
     <p class="desc">
       This note was already withdrawn in
       <a id="wtx" target="_blank" rel="noopener">a real transaction</a>. Replaying the
@@ -155,11 +181,12 @@
     </p>
     <div class="row"><button data-act="replay">Try to spend it twice</button></div>
     <div class="out" id="out-replay"></div>
+  </div></div>
   </div>
 
 </div></section>
 
-<footer><div class="wrap">
+<footer><div class="shell">
   Veil is a research prototype on testnet and has not been audited. Source, tests and
   the full security write-up are on
   <a href="https://github.com/Risingtell/veil" target="_blank" rel="noopener">GitHub</a>.
@@ -417,22 +444,60 @@
     },
   };
 
+  var LABEL = { ok: ["pass", "Pass"], bad: ["fail", "Fail"], info: ["info", "Check note"] };
+  var NUM = { tree: "1", verify: "2", redirect: "3", replay: "4" };
+  function setTag(act, cls, text) {
+    var t = document.getElementById("t-" + act);
+    var b = document.getElementById("b-" + act);
+    t.className = "tag " + cls; t.textContent = text;
+    b.className = "tag " + cls; b.textContent = NUM[act] + " " + text;
+  }
+
+  var inflight = {};
+  function run(act) {
+    // A check already running is joined, not restarted, so its button label
+    // is always restored from the original text.
+    if (inflight[act]) return inflight[act];
+    var btn = document.querySelector('button[data-act="' + act + '"]');
+    var label = btn.getAttribute("data-label") || btn.textContent;
+    btn.setAttribute("data-label", label);
+    btn.disabled = true;
+    btn.textContent = "Calling the network\u2026";
+    setTag(act, "run", "Running");
+    inflight[act] = ACTIONS[act]()
+      .catch(function (e) { return explainFailure("out-" + act, e); })
+      .then(function () {
+        inflight[act] = null;
+        btn.disabled = false;
+        btn.textContent = label;
+        var v = document.querySelector("#out-" + act + " .verdict");
+        var kind = v ? (v.classList.contains("ok") ? "ok" : v.classList.contains("bad") ? "bad" : "info") : "bad";
+        setTag(act, LABEL[kind][0], LABEL[kind][1]);
+      });
+    return inflight[act];
+  }
+
   document.querySelectorAll("button[data-act]").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      var act = btn.getAttribute("data-act");
-      var label = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = "Calling the network…";
-      ACTIONS[act]()
-        .catch(function (e) {
-          return explainFailure("out-" + act, e);
-        })
-        .then(function () {
-          btn.disabled = false;
-          btn.textContent = label;
-        });
-    });
+    btn.addEventListener("click", function () { run(btn.getAttribute("data-act")); });
   });
+
+  var runAll = document.getElementById("runall");
+  runAll.addEventListener("click", function () {
+    runAll.disabled = true;
+    ["tree", "verify", "redirect", "replay"].reduce(function (p, act) {
+      return p.then(function () { return run(act); });
+    }, Promise.resolve()).then(function () { runAll.disabled = false; });
+  });
+
+  // Show the protocol the network is actually on right now.
+  fetch(RPC, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getNetwork" }),
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (j) { document.getElementById("proto").textContent = "Protocol " + j.result.protocolVersion; })
+    .catch(function () { document.getElementById("proto").textContent = "unreachable"; });
 })();
 </script>
 </body>

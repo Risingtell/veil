@@ -3,187 +3,311 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Veil ZK. Compliant Privacy Pool on Stellar</title>
-<meta name="description" content="Veil is a privacy pool on Stellar where every withdrawal proves, in zero-knowledge, that funds came from a compliance-approved set. Private for the public, auditable for regulators." />
+<title>Veil. Private payroll on Stellar, provably compliant</title>
+<meta name="description" content="Veil is a compliant privacy pool on Stellar. Each payout goes to a fresh wallet, every withdrawal proves in zero knowledge that it comes from an approved set, and a designated auditor can trace any payout. Live on Stellar testnet." />
 <link rel="icon" type="image/png" href="veil-logo.png" />
-<meta property="og:title" content="Veil ZK. Compliant Privacy Pool on Stellar" />
-<meta property="og:description" content="Private payouts that carry their own proof of compliance. Live on Stellar testnet with Protocol 26 BN254." />
-<meta property="og:image" content="veil-logo.png" />
+<meta property="og:title" content="Veil. Private payroll on Stellar, provably compliant" />
+<meta property="og:description" content="Zero-knowledge payouts verified on-chain by Soroban, with an auditor view key for regulators. Live on Stellar testnet." />
+<meta property="og:image" content="https://veil-zk.vercel.app/og.png" />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <style>
   :root{
-    --emerald:#059669; --emerald2:#10B981; --teal:#14B8A6; --mint:#34D399;
-    --ink:#0B1B16; --ink2:#13241E; --muted:#5C6F68;
-    --bg:#FBFDFC; --card:#FFFFFF; --line:#E4EFE9; --soft:#F1F8F5;
+    --ink:#0B1B16; --ink2:#0F241D; --ink3:#143128;
+    --mint:#34D399; --mint2:#6EE7B7; --emerald:#047857; --teal:#14B8A6;
+    --paper:#F4F8F6; --white:#FFFFFF; --line:#DCE8E2; --muted:#4F625B;
+    --dline:rgba(255,255,255,.10); --dtext:#C9DDD4; --dmuted:#8FA89E;
+    --coral:#E0714F;
+    --max:1280px; --pad:clamp(1.25rem,5vw,4.5rem); --sec:clamp(4.5rem,9vw,8rem);
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{scroll-behavior:smooth}
-  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    background:var(--bg);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased}
+  html,body{max-width:100%;overflow-x:hidden}
+  body{font-family:Inter,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--white);
+    color:var(--ink);line-height:1.6;font-size:17px;-webkit-font-smoothing:antialiased}
   a{color:inherit;text-decoration:none}
-  .wrap{max-width:1060px;margin:0 auto;padding:0 24px}
-  .accent{color:var(--emerald)}
-  .grad{background:linear-gradient(120deg,var(--emerald),var(--teal));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-  .btn{display:inline-block;padding:13px 24px;border-radius:12px;font-weight:600;font-size:15px;transition:transform .12s ease,box-shadow .2s ease}
-  .btn-primary{background:linear-gradient(135deg,var(--emerald),var(--teal));color:#fff;box-shadow:0 10px 26px rgba(5,150,105,.28)}
-  .btn-primary:hover{transform:translateY(-2px)}
-  .btn-ghost{border:1px solid var(--line);color:var(--ink);background:#fff}
-  .btn-ghost:hover{border-color:var(--emerald);color:var(--emerald)}
+  .shell{max-width:var(--max);margin:0 auto;padding:0 var(--pad)}
+  .mono{font-family:var(--mono)}
 
-  nav{position:sticky;top:0;z-index:10;backdrop-filter:blur(10px);background:rgba(251,253,252,.82);border-bottom:1px solid var(--line)}
-  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
-  .brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.5px;font-size:17px}
-  .brand img{width:34px;height:34px;border-radius:9px}
-  .brand .zk{color:var(--teal)}
-  .navlinks{display:flex;gap:24px;align-items:center;font-size:14px;color:var(--muted)}
-  .navlinks a:hover{color:var(--ink)}
-  @media(max-width:680px){.navlinks{display:none}}
+  /* bands */
+  .band{position:relative;padding:var(--sec) 0}
+  .band.dark{background:var(--ink);color:var(--white)}
+  .band.dark2{background:var(--ink2);color:var(--white);border-top:1px solid var(--dline)}
+  .band.paper{background:var(--paper)}
+  .band.white{background:var(--white)}
 
-  header{position:relative;overflow:hidden;padding:96px 0 76px;text-align:center;
-    background:
-      radial-gradient(900px 420px at 50% -8%, rgba(16,185,129,.16), transparent 65%),
-      linear-gradient(180deg,#fff,var(--bg));}
-  header::before{content:"";position:absolute;inset:0;
-    background-image:radial-gradient(rgba(5,150,105,.10) 1px,transparent 1px);background-size:26px 26px;
-    mask:radial-gradient(600px 320px at 50% 0%,#000,transparent 70%);opacity:.6}
-  header .wrap{position:relative}
-  .pill{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--emerald);
-    border:1px solid rgba(5,150,105,.28);background:rgba(5,150,105,.06);padding:6px 14px;border-radius:999px;margin-bottom:26px;font-weight:600}
-  .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--emerald2);box-shadow:0 0 0 4px rgba(16,185,129,.18)}
-  h1{font-size:56px;line-height:1.08;font-weight:800;letter-spacing:-1.5px;margin-bottom:18px}
-  .sub{font-size:19px;color:var(--muted);max-width:680px;margin:0 auto 34px}
-  .cta{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
-  @media(max-width:680px){h1{font-size:38px}.sub{font-size:17px}header{padding:70px 0 56px}}
+  .eyebrow{font-family:var(--mono);font-size:.75rem;letter-spacing:.2em;text-transform:uppercase;
+    font-weight:600;color:var(--emerald);margin-bottom:1.25rem;display:block}
+  .dark .eyebrow,.dark2 .eyebrow{color:var(--mint)}
+  h1,h2,h3{letter-spacing:-.03em;line-height:1.02}
+  .h-xl{font-size:clamp(3rem,8vw,7.5rem);font-weight:900;letter-spacing:-.045em;line-height:.95}
+  .h-l{font-size:clamp(2.25rem,5vw,4.5rem);font-weight:800}
+  .lead{font-size:clamp(1.05rem,1.4vw,1.3rem);color:var(--muted);max-width:46rem;margin-top:1.5rem}
+  .dark .lead,.dark2 .lead{color:var(--dtext)}
+  .hl{color:var(--mint)}
+  .hl-l{color:var(--emerald)}
 
-  section{padding:66px 0}
-  .eyebrow{color:var(--teal);font-weight:700;font-size:13px;letter-spacing:1.6px;text-transform:uppercase;margin-bottom:10px}
-  h2{font-size:33px;font-weight:800;letter-spacing:-.6px;margin-bottom:14px}
-  .lead{color:var(--muted);font-size:17px;max-width:730px}
+  /* buttons */
+  .cta{display:flex;gap:.75rem;flex-wrap:wrap;margin-top:2.5rem}
+  .btn{display:inline-flex;align-items:center;gap:.6rem;padding:1rem 1.6rem;font-weight:700;font-size:1rem;
+    border:2px solid currentColor;transition:background .15s,color .15s,border-color .15s}
+  .btn-mint{background:var(--mint);color:var(--ink);border-color:var(--mint)}
+  .btn-mint:hover{background:transparent;color:var(--mint)}
+  .btn-line{color:var(--white)}
+  .btn-line:hover{background:var(--white);color:var(--ink);border-color:var(--white)}
+  .btn-ink{background:var(--ink);color:var(--white);border-color:var(--ink)}
+  .btn-ink:hover{background:transparent;color:var(--ink)}
+  .btn-ghost{color:var(--ink)}
+  .btn-ghost:hover{background:var(--ink);color:var(--white);border-color:var(--ink)}
+  .arrow{font-family:var(--mono)}
 
-  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:40px}
-  @media(max-width:820px){.grid{grid-template-columns:1fr}}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:28px;
-    box-shadow:0 1px 2px rgba(11,27,22,.04),0 8px 24px rgba(11,27,22,.04)}
-  .card .ic{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;
-    background:linear-gradient(135deg,rgba(5,150,105,.12),rgba(20,184,166,.16));font-size:22px;margin-bottom:16px}
-  .card h3{font-size:18px;margin-bottom:8px}
-  .card p{color:var(--muted);font-size:15px}
+  /* nav */
+  nav{position:sticky;top:0;z-index:20;background:rgba(11,27,22,.86);backdrop-filter:saturate(160%) blur(14px);
+    border-bottom:1px solid var(--dline);color:var(--white)}
+  nav .shell{display:flex;align-items:center;justify-content:space-between;height:68px;gap:1rem}
+  .brand{display:flex;align-items:center;gap:.7rem;font-weight:900;letter-spacing:.14em;font-size:1rem}
+  .brand img{width:36px;height:36px}
+  .brand .zk{color:var(--mint)}
+  .navlinks{display:flex;gap:2rem;align-items:center;font-size:.92rem;color:var(--dtext)}
+  .navlinks a:hover{color:var(--mint)}
+  .navlinks .btn{padding:.55rem 1rem;font-size:.9rem}
+  @media(max-width:860px){.navlinks a:not(.btn){display:none}}
 
-  .split{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:38px}
-  @media(max-width:820px){.split{grid-template-columns:1fr}}
-  .panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:28px;box-shadow:0 8px 24px rgba(11,27,22,.04)}
-  .panel.bad{border-color:rgba(225,108,108,.3);background:#fdf6f6}
-  .panel.good{border-color:rgba(5,150,105,.35);background:var(--soft)}
-  .panel h3{font-size:16px;margin-bottom:12px}
-  .panel ul{list-style:none}
-  .panel li{padding:7px 0 7px 26px;position:relative;color:var(--ink2);font-size:15px}
-  .panel li::before{position:absolute;left:0;top:7px;font-weight:700}
-  .bad li::before{content:"✕";color:#dc6b6b}
-  .good li::before{content:"✓";color:var(--emerald)}
+  /* hero */
+  .hero{overflow:hidden;padding:clamp(5rem,10vw,9rem) 0 0}
+  .hero .grid-bg{position:absolute;inset:0;pointer-events:none;
+    background-image:linear-gradient(rgba(52,211,153,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(52,211,153,.07) 1px,transparent 1px);
+    background-size:96px 96px;mask-image:linear-gradient(180deg,#000 30%,transparent 95%)}
+  .hero .glow{position:absolute;right:-20%;top:-35%;width:70vw;height:70vw;max-width:1100px;max-height:1100px;
+    background:radial-gradient(circle,rgba(16,185,129,.30),transparent 62%);pointer-events:none}
+  .hero .shell{position:relative}
+  .live-pill{display:inline-flex;align-items:center;gap:.6rem;font-family:var(--mono);font-size:.75rem;
+    letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--mint);
+    border:1px solid rgba(52,211,153,.45);background:rgba(52,211,153,.08);padding:.5rem .9rem;margin-bottom:2rem}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--mint);box-shadow:0 0 0 0 rgba(52,211,153,.6);animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(52,211,153,.55)}70%{box-shadow:0 0 0 10px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
+  .hero .lead{max-width:44rem}
 
-  .live{background:linear-gradient(180deg,var(--soft),#fff);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-  .facts{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:30px}
-  @media(max-width:640px){.facts{grid-template-columns:1fr}}
-  .fact{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 20px}
-  .fact .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
-  .fact .v{font-size:15px;font-weight:600;word-break:break-all}
-  .fact .v a{color:var(--emerald)}
-  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--dline);
+    border:1px solid var(--dline);margin-top:clamp(4rem,8vw,6.5rem)}
+  .stat{background:var(--ink);padding:1.75rem 1.5rem}
+  .stat .n{font-family:var(--mono);font-size:clamp(1.9rem,3.2vw,2.75rem);font-weight:600;color:var(--white);letter-spacing:-.02em;line-height:1}
+  .stat .l{color:var(--dmuted);font-size:.92rem;margin-top:.75rem;line-height:1.45}
+  @media(max-width:900px){.stats{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:520px){.stats{grid-template-columns:1fr}}
 
-  .video{position:relative;padding-bottom:56.25%;height:0;border-radius:18px;overflow:hidden;border:1px solid var(--line);margin-top:34px;box-shadow:0 18px 50px rgba(11,27,22,.12)}
-  .video iframe{position:absolute;top:0;left:0;width:100%;height:100%}
+  /* hairline grids */
+  .hgrid{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);margin-top:clamp(2.5rem,5vw,4rem)}
+  .hgrid.c2{grid-template-columns:repeat(2,1fr)}
+  .hgrid.c3{grid-template-columns:repeat(3,1fr)}
+  .hgrid.c4{grid-template-columns:repeat(4,1fr)}
+  .dark .hgrid,.dark2 .hgrid{background:var(--dline);border-color:var(--dline)}
+  @media(max-width:900px){.hgrid.c3,.hgrid.c4{grid-template-columns:1fr 1fr}}
+  @media(max-width:640px){.hgrid.c2,.hgrid.c3,.hgrid.c4{grid-template-columns:1fr}}
+  .cell{background:var(--white);padding:clamp(1.5rem,3vw,2.5rem);position:relative}
+  .paper .cell{background:var(--white)}
+  .dark .cell{background:var(--ink)}
+  .dark2 .cell{background:var(--ink2)}
+  .cell::before{content:"";position:absolute;left:0;top:0;height:3px;width:100%;background:var(--mint);
+    transform:scaleX(0);transform-origin:left;transition:transform .35s cubic-bezier(.16,1,.3,1)}
+  .cell:hover::before{transform:scaleX(1)}
+  .cell .num{font-family:var(--mono);font-size:.8rem;letter-spacing:.16em;color:var(--emerald);font-weight:600}
+  .dark .cell .num,.dark2 .cell .num{color:var(--mint)}
+  .cell h3{font-size:clamp(1.3rem,2vw,1.65rem);font-weight:800;margin:.9rem 0 .7rem}
+  .cell p{color:var(--muted);font-size:1rem}
+  .dark .cell p,.dark2 .cell p{color:var(--dtext)}
 
-  footer{background:var(--ink);color:#cfe3da;padding:50px 0;text-align:center;font-size:14px}
-  footer .brand{justify-content:center;margin-bottom:14px;color:#fff}
-  footer a.accent{color:var(--mint)}
+  /* compare */
+  .cmp h3{font-size:1.1rem;font-weight:800;letter-spacing:-.01em;margin-bottom:1.25rem;display:flex;align-items:center;gap:.6rem}
+  .tag{font-family:var(--mono);font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;font-weight:600;
+    padding:.25rem .5rem;border:1px solid}
+  .tag.bad{color:#B4472B;border-color:rgba(224,113,79,.5)}
+  .tag.good{color:var(--emerald);border-color:rgba(4,120,87,.45)}
+  .cmp ul{list-style:none}
+  .cmp li{padding:.85rem 0 .85rem 2rem;position:relative;border-top:1px solid var(--line);font-size:1.02rem}
+  .cmp li::before{position:absolute;left:0;top:.8rem;font-family:var(--mono);font-weight:700}
+  .cmp.bad li::before{content:"\00D7";color:#B4472B;font-size:1.2rem;top:.6rem}
+  .cmp.good li::before{content:"\2713";color:var(--emerald)}
+
+  /* auditor instrument */
+  .instrument{background:var(--ink);border:1px solid var(--dline);padding:1.5rem;margin-top:1.5rem;font-family:var(--mono);
+    font-size:.85rem;line-height:1.7;color:var(--dtext);overflow-wrap:anywhere}
+  .dark2 .cell .instrument{background:var(--ink)}
+  .instrument .k{color:var(--dmuted)}
+  .instrument .v{color:var(--white)}
+  .instrument .hit{color:var(--ink);background:var(--mint);padding:0 .35rem;font-weight:600}
+  .instrument .faint{color:#5f7a70}
+
+  /* facts */
+  .fact .k{font-family:var(--mono);font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .fact .v{margin-top:.6rem;font-weight:600;font-size:1.05rem;overflow-wrap:anywhere}
+  .fact .v.mono{font-size:.95rem}
+  .fact .v a{color:var(--emerald);border-bottom:1px solid rgba(4,120,87,.3)}
+  .fact .v a:hover{border-color:var(--emerald)}
+
+  /* roadmap */
+  .road .cell h3{margin-top:.6rem}
+  .road ul{list-style:none;margin-top:1rem}
+  .road li{padding:.6rem 0;border-top:1px solid var(--line);font-size:.98rem;color:var(--ink)}
+  .road .when{font-family:var(--mono);font-size:.75rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-top:1.25rem}
+
+  /* closing CTA */
+  .closing{background:var(--mint);color:var(--ink);padding:clamp(4rem,8vw,6.5rem) 0}
+  .closing .h-l{max-width:20ch}
+  .closing p{font-size:1.15rem;margin-top:1.25rem;max-width:40rem;color:#0f3a2c}
+  .closing .btn-ink:hover{color:var(--ink);border-color:var(--ink)}
+
+  footer{background:var(--ink);color:var(--dtext);padding:3.5rem 0;font-size:.95rem;border-top:1px solid var(--dline)}
+  footer .shell{display:flex;justify-content:space-between;align-items:flex-start;gap:2rem;flex-wrap:wrap}
+  footer .links{display:flex;gap:1.75rem;flex-wrap:wrap}
+  footer .links a:hover{color:var(--mint)}
+  footer .fine{color:var(--dmuted);font-size:.88rem;margin-top:.75rem;max-width:34rem}
+
+  code{font-family:var(--mono);font-size:.9em;background:rgba(4,120,87,.08);padding:.05rem .35rem}
+  .dark code,.dark2 code{background:rgba(52,211,153,.12);color:var(--mint2)}
+
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
 </style>
 </head>
 <body>
 
-<nav><div class="wrap">
-  <div class="brand"><img src="veil-logo.png" alt="Veil"/> VEIL<span class="zk">ZK</span></div>
+<nav><div class="shell">
+  <a class="brand" href="#top"><img src="veil-logo.png" alt="Veil" />VEIL<span class="zk">ZK</span></a>
   <div class="navlinks">
     <a href="#how">How it works</a>
-    <a href="#auditor">Auditor view-key</a>
-    <a href="#live">Live on testnet</a>
-    <a href="https://github.com/Risingtell/veil" target="_blank">GitHub</a>
+    <a href="#auditor">Auditor</a>
+    <a href="#live">On testnet</a>
+    <a href="#roadmap">Roadmap</a>
+    <a href="https://github.com/Risingtell/veil" target="_blank" rel="noopener">GitHub</a>
+    <a class="btn btn-mint" href="console.html">Verify it</a>
   </div>
 </div></nav>
 
-<header><div class="wrap">
-  <span class="pill"><span class="dot"></span> Stellar Hacks: Real-World ZK</span>
-  <h1>Private payouts that prove<br/>their own <span class="grad">compliance</span></h1>
-  <p class="sub">Veil is a privacy pool on Stellar where every withdrawal proves, in zero-knowledge, that the funds came from a real deposit inside a compliance-approved set, privacy for honest users, exclusion of bad actors, in a single proof.</p>
-  <div class="cta">
-    <a class="btn btn-primary" href="console.html">Verify it yourself</a>
-    <a class="btn btn-ghost" href="https://github.com/Risingtell/veil" target="_blank">View on GitHub</a>
+<header class="band dark hero" id="top">
+  <div class="grid-bg"></div><div class="glow"></div>
+  <div class="shell">
+    <span class="live-pill"><span class="dot"></span>Live on Stellar testnet</span>
+    <h1 class="h-xl">Private payroll.<br/><span class="hl">Provably compliant.</span></h1>
+    <p class="lead">Veil pays each person to a fresh wallet that cannot be linked to the payer. Every withdrawal carries a zero-knowledge proof, checked on-chain by a Soroban contract, that the money came from an approved set. A designated auditor can still trace any single payout.</p>
+    <div class="cta">
+      <a class="btn btn-mint" href="console.html">Verify it in your browser <span class="arrow">&rarr;</span></a>
+      <a class="btn btn-line" href="https://github.com/Risingtell/veil" target="_blank" rel="noopener">Read the code</a>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="n">1 proof</div><div class="l">covers ownership, the approved set, a single spend and the exact payee</div></div>
+      <div class="stat"><div class="n">8</div><div class="l">public inputs bound into every withdrawal</div></div>
+      <div class="stat"><div class="n">21.3M</div><div class="l">CPU instructions per deposit, against a 100M limit</div></div>
+      <div class="stat"><div class="n">12</div><div class="l">contract tests, including five attack cases</div></div>
+    </div>
   </div>
-</div></header>
+</header>
 
-<section id="problem"><div class="wrap">
-  <div class="eyebrow">The problem</div>
-  <h2>Privacy without compliance is a dead end</h2>
-  <p class="lead">A plain mixer is indistinguishable from money laundering, so banks, payroll providers and aid organizations can't touch it. Veil fixes the trade-off the way the Privacy Pools paper proposes, provable compliance baked into every private withdrawal.</p>
-  <div class="split">
-    <div class="panel bad"><h3>Plain mixers</h3><ul>
+<section class="band paper" id="problem"><div class="shell">
+  <span class="eyebrow">The problem</span>
+  <h2 class="h-l">Payroll on a public chain shows <span class="hl-l">every salary</span>.</h2>
+  <p class="lead">Anyone can read who was paid and how much. Mixers hide that, but they hide criminals just as well, so no bank, payroll provider or aid agency can use them. Veil follows the Privacy Pools design: payouts stay private, and each one proves it came from an approved set.</p>
+  <div class="hgrid c2">
+    <div class="cell cmp bad"><h3>Plain mixers <span class="tag bad">Unusable</span></h3><ul>
       <li>Anyone can hide, including bad actors</li>
-      <li>No way to prove funds are clean</li>
-      <li>Regulators are locked out entirely</li>
-      <li>Institutions won't use them</li>
+      <li>No way to show funds are clean</li>
+      <li>Regulators are locked out</li>
+      <li>Institutions will not touch them</li>
     </ul></div>
-    <div class="panel good"><h3>Veil</h3><ul>
-      <li>Withdrawals prove membership in an approved set</li>
-      <li>Zero-knowledge, no amounts or links revealed</li>
-      <li>A regulator view-key for full auditability</li>
-      <li>Built for payroll &amp; aid disbursement</li>
+    <div class="cell cmp good"><h3>Veil <span class="tag good">Compliant</span></h3><ul>
+      <li>Every withdrawal proves it is in an approved set</li>
+      <li>No link between payer and payee on-chain</li>
+      <li>An auditor view key traces any payout</li>
+      <li>Built for payroll and aid disbursement</li>
     </ul></div>
   </div>
 </div></section>
 
-<section id="how"><div class="wrap">
-  <div class="eyebrow">How it works</div>
-  <h2>Zero-knowledge that is load-bearing</h2>
-  <p class="lead">The Soroban contract releases nothing unless a real Groth16 proof verifies on-chain via Stellar's new Protocol 26 <span class="mono">BN254 pairing_check</span> host function. Remove the ZK and the product doesn't exist.</p>
-  <div class="grid">
-    <div class="card"><div class="ic">🔒</div><h3>Verified on-chain</h3><p>A single Circom circuit proves note ownership, deposit-tree membership, approved-set membership, and an unspent nullifier, checked by the contract itself, not a server.</p></div>
-    <div class="card"><div class="ic">💸</div><h3>Private payout</h3><p>Deposit a fixed denomination; later withdraw to a fresh, unlinkable address by submitting a proof. Live on testnet: a real 1 XLM private payout with on-chain double-spend protection.</p></div>
-    <div class="card"><div class="ic">🛡️</div><h3>Compliance gate</h3><p>Every withdrawal must also prove the note is in an Association Set Provider's approved set. Honest users stay private; flagged deposits are provably un-withdrawable.</p></div>
+<section class="band white" id="how"><div class="shell">
+  <span class="eyebrow">How it works</span>
+  <h2 class="h-l">Three steps. The contract checks the proof itself.</h2>
+  <p class="lead">The Soroban contract pays nothing unless a Groth16 proof verifies on-chain through Stellar's BN254 <code>pairing_check</code> host function. It also builds its own Merkle tree with the native Poseidon host function, so no operator can invent a deposit.</p>
+  <div class="hgrid c3">
+    <div class="cell"><span class="num">01 / DEPOSIT</span><h3>The payer funds the pool</h3><p>Each deposit adds a commitment to a tree the contract maintains, plus an encrypted record that only the auditor can open.</p></div>
+    <div class="cell"><span class="num">02 / WITHDRAW</span><h3>Each person withdraws privately</h3><p>A fresh wallet receives the payout with a proof that the note is real, approved and unspent, and that it pays this exact address. A relayer covers the fee.</p></div>
+    <div class="cell"><span class="num">03 / AUDIT</span><h3>The auditor traces on demand</h3><p>With the view key, a compliance officer opens any record and links an anonymous payout back to its deposit. The public never can.</p></div>
   </div>
 </div></section>
 
-<section id="auditor"><div class="wrap">
-  <div class="eyebrow">The differentiator</div>
-  <h2>Auditor view-key, private <span class="grad">and</span> auditable</h2>
-  <p class="lead">A designated regulator holds a BabyJubJub view-key. At deposit time, an encrypted record is published <strong>on-chain</strong>, so the regulator's ability to investigate never depends on a depositor keeping data.</p>
-  <div class="split">
-    <div class="panel"><h3>🌐 The public sees</h3>
-      <p style="color:var(--muted);font-size:15px">Only ciphertext. Withdrawals are unlinkable, nobody can connect a payout to a deposit or a person.</p>
+<section class="band dark2" id="auditor"><div class="shell">
+  <span class="eyebrow">The auditor view key</span>
+  <h2 class="h-l">Private to the public. <span class="hl">Open to the auditor.</span></h2>
+  <p class="lead">At deposit, an encrypted record of identity and nullifier is published on-chain to the auditor's key, using Poseidon-ElGamal over BabyJubJub. The regulator's ability to investigate never depends on anyone keeping files.</p>
+  <div class="hgrid c2">
+    <div class="cell"><span class="num">THE PUBLIC SEES</span><h3>Ciphertext only</h3>
+      <div class="instrument"><span class="k">audit_records[0] =</span><br/><span class="v">de3277ab12fdbe70b8cd7dbc0a6479cd4e9cbe5c04eb60bf</span><span class="faint">&hellip;</span><br/><br/><span class="k">withdrawal reveals only</span><br/><span class="k">nullifierHash =</span> <span class="v">186354661cb7a2e3fbf60833</span><span class="faint">&hellip;</span></div>
     </div>
-    <div class="panel good"><h3>🔑 The auditor sees</h3>
-      <p style="color:var(--ink2);font-size:15px">Decrypts any record with the view-key, then hashes the nullifier to trace an anonymous withdrawal back to a real identity, on demand.</p>
+    <div class="cell"><span class="num">THE AUDITOR SEES</span><h3>Who was paid, on request</h3>
+      <div class="instrument"><span class="k">deposit #0</span> <span class="v">Aisha Bello (Payroll #001)</span><br/><span class="k">deposit #1</span> <span class="v">Chidi Okafor (Payroll #002)</span><br/><span class="k">deposit #2</span> <span class="hit">Fatima Sani (Payroll #003)</span><br/><span class="k">deposit #3</span> <span class="v">Emeka Eze (Payroll #004)</span><br/><br/><span class="k">payout to GDK3XQFVN5&hellip; traced to</span> <span class="hit">deposit #2</span></div>
     </div>
   </div>
+  <p class="lead" style="font-size:.95rem">Output of <code>node scripts/audit_demo.mjs</code> against the live testnet contract, with demo payroll identities.</p>
 </div></section>
 
-<section id="live" class="live"><div class="wrap">
-  <div class="eyebrow">Live on Stellar testnet</div>
-  <h2>Not a mockup, the real thing on-chain</h2>
-  <p class="lead">Every claim here is reproducible against the deployed contract. One command (<span class="mono">bash scripts/show.sh</span>) walks through it all in ~8 seconds.</p>
-  <div class="facts">
-    <div class="fact"><div class="k">Network</div><div class="v">Stellar Testnet · Protocol 26 BN254</div></div>
-    <div class="fact"><div class="k">Pool contract</div><div class="v mono"><a href="https://stellar.expert/explorer/testnet/contract/CCXOIBSGTXVYDWY6RBLVAVNYERHGLKAE4UCU73CEBXGUUNP622WHHWLI" target="_blank">CCXOIBSG…NP622WHHWLI</a></div></div>
-    <div class="fact"><div class="k">Private withdrawal tx</div><div class="v mono"><a href="https://stellar.expert/explorer/testnet/tx/1cb5e2ac9eb87225977fe6552b14bf32936a55767116b4a7e6c384bcad4794cb" target="_blank">1cb5e2ac…cad4794cb</a></div></div>
-    <div class="fact"><div class="k">On-chain ZK verify</div><div class="v"><a href="console.html">Run verify_proof yourself</a> → true</div></div>
+<section class="band paper" id="live"><div class="shell">
+  <span class="eyebrow">Live on Stellar testnet</span>
+  <h2 class="h-l">Check every claim yourself.</h2>
+  <p class="lead">The console runs four real calls against the deployed contract: read the tree it built, verify a proof on-chain, try to redirect a payout, and try to spend a note twice. No wallet, no signup.</p>
+  <div class="hgrid c4">
+    <div class="cell fact"><div class="k">Network</div><div class="v">Stellar testnet</div></div>
+    <div class="cell fact"><div class="k">Pool contract</div><div class="v mono"><a href="https://stellar.expert/explorer/testnet/contract/CCXOIBSGTXVYDWY6RBLVAVNYERHGLKAE4UCU73CEBXGUUNP622WHHWLI" target="_blank" rel="noopener">CCXOIBSG&hellip;622WHHWLI</a></div></div>
+    <div class="cell fact"><div class="k">Private payout</div><div class="v mono"><a href="https://stellar.expert/explorer/testnet/tx/1cb5e2ac9eb87225977fe6552b14bf32936a55767116b4a7e6c384bcad4794cb" target="_blank" rel="noopener">1cb5e2ac&hellip;cad4794cb</a></div></div>
+    <div class="cell fact"><div class="k">Source and tests</div><div class="v"><a href="https://github.com/Risingtell/veil" target="_blank" rel="noopener">github.com/Risingtell/veil</a></div></div>
   </div>
-  <div class="cta" style="margin-top:34px">
-    <a class="btn btn-primary" href="console.html">Verify it yourself in the browser</a>
-    <a class="btn btn-ghost" href="https://github.com/Risingtell/veil" target="_blank">Read the contract</a>
+  <div class="cta"><a class="btn btn-ink" href="console.html">Open the console <span class="arrow">&rarr;</span></a></div>
+</div></section>
+
+<section class="band white road" id="roadmap"><div class="shell">
+  <span class="eyebrow">Roadmap</span>
+  <h2 class="h-l">Next, on testnet.</h2>
+  <p class="lead">Every step below is built and tested on Stellar testnet. The full technical plan, with how each item is verified, is in the <a class="hl-l" href="https://github.com/Risingtell/veil/blob/master/docs/ARCHITECTURE.md" target="_blank" rel="noopener" style="border-bottom:1px solid">architecture document</a>.</p>
+  <div class="hgrid c3">
+    <div class="cell"><span class="num">PHASE 1</span><h3>Harden the protocol</h3><ul>
+      <li>Audit records proven in a circuit</li>
+      <li>Event-based storage and a TTL policy</li>
+      <li>USDC pools in fixed sizes</li>
+      <li>Open-source relayer</li>
+    </ul></div>
+    <div class="cell"><span class="num">PHASE 2</span><h3>Tools people can use</h3><ul>
+      <li>Web app for deposit and withdraw</li>
+      <li>Console for the approvals operator</li>
+      <li>Console for the auditor</li>
+      <li>Monitoring, threat model and plan</li>
+    </ul></div>
+    <div class="cell"><span class="num">PHASE 3</span><h3>Prove it with others</h3><ul>
+      <li>Multi-party trusted setup</li>
+      <li>veil-sdk on npm</li>
+      <li>Payroll pilot with outside testers</li>
+      <li>Full documentation site</li>
+    </ul></div>
   </div>
 </div></section>
 
-<footer><div class="wrap">
-  <div class="brand"><img src="veil-logo.png" alt="Veil" style="width:30px;height:30px;border-radius:8px"/> VEIL<span style="color:var(--mint)">ZK</span></div>
-  <p>Built from scratch on BN254. Circom + snarkjs + Soroban. Research prototype; not audited.</p>
-  <p style="margin-top:8px"><a class="accent" href="https://github.com/Risingtell/veil" target="_blank">github.com/Risingtell/veil</a></p>
+<section class="closing"><div class="shell">
+  <h2 class="h-l">Run the four checks. It takes about ten seconds.</h2>
+  <p>Every result comes from the live contract on Stellar testnet, not from a recording.</p>
+  <div class="cta"><a class="btn btn-ink" href="console.html">Open the console <span class="arrow">&rarr;</span></a></div>
+</div></section>
+
+<footer><div class="shell">
+  <div>
+    <a class="brand" href="#top"><img src="veil-logo.png" alt="" style="width:30px;height:30px" />VEIL<span class="zk" style="color:var(--mint)">ZK</span></a>
+    <p class="fine">Research prototype on Stellar testnet. Not audited. Do not use with real funds. Built by Rising Technology, Kano, Nigeria.</p>
+  </div>
+  <div class="links">
+    <a href="console.html">Console</a>
+    <a href="https://github.com/Risingtell/veil" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://github.com/Risingtell/veil/blob/master/docs/ARCHITECTURE.md" target="_blank" rel="noopener">Architecture</a>
+    <a href="https://github.com/Risingtell/veil#security-what-was-broken-and-what-fixed-it" target="_blank" rel="noopener">Security</a>
+  </div>
 </div></footer>
 
 </body>
